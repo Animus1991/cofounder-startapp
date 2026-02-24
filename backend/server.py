@@ -1658,7 +1658,7 @@ async def list_tools(
     limit: int = 20
 ):
     """List marketplace tools"""
-    query = {"is_approved": True}
+    query = {}
     if category:
         query["category"] = category
     if tags:
