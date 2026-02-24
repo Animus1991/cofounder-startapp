@@ -379,48 +379,42 @@ class BackendTester:
             return False
 
     async def test_like_post(self, email: str, post_id: str) -> bool:
-        """Test like/unlike post"""
+        """Test react to post"""
         if email not in self.tokens or not post_id:
-            self.log_result(f"Like Post ({email})", False, "No token available or post_id missing")
+            self.log_result(f"React Post ({email})", False, "No token available or post_id missing")
             return False
             
         try:
             response = await self.client.post(
-                f"{API_BASE}/posts/{post_id}/like",
-                headers={"Authorization": f"Bearer {self.tokens[email]}"}
+                f"{API_BASE}/posts/{post_id}/react",
+                json={"type": "like"},
+                headers={
+                    "Authorization": f"Bearer {self.tokens[email]}",
+                    "Content-Type": "application/json"
+                }
             )
             
             if response.status_code == 200:
                 data = response.json()
-                if "liked" in data:
-                    like_status = "liked" if data["liked"] else "unliked"
-                    self.log_result(
-                        f"Like Post ({email})",
-                        True,
-                        f"Post {like_status} successfully"
-                    )
-                    return True
-                else:
-                    self.log_result(
-                        f"Like Post ({email})",
-                        False,
-                        "Missing 'liked' status in response",
-                        data
-                    )
-                    return False
+                self.log_result(
+                    f"React Post ({email})",
+                    True,
+                    f"Post reaction added successfully"
+                )
+                return True
             else:
                 data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
                 self.log_result(
-                    f"Like Post ({email})",
+                    f"React Post ({email})",
                     False,
-                    f"HTTP {response.status_code}: {data.get('detail', 'Like post failed')}",
+                    f"HTTP {response.status_code}: {data.get('detail', 'React post failed')}",
                     data
                 )
                 return False
                 
         except Exception as e:
             self.log_result(
-                f"Like Post ({email})",
+                f"React Post ({email})",
                 False,
                 f"Exception: {str(e)}"
             )
