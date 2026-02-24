@@ -1,11 +1,260 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { LoadingScreen } from '../src/components/LoadingScreen';
+import api from '../src/utils/api';
+
+interface Course {
+  course_id: string;
+  title: string;
+  description: string;
+  instructor: string;
+  instructor_image?: string;
+  category: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  duration_hours: number;
+  lessons_count: number;
+  enrolled_count: number;
+  avg_rating: number;
+  thumbnail?: string;
+  tags: string[];
+  price: number;
+  is_free: boolean;
+}
+
+const categories = ['all', 'Fundraising', 'Product', 'Growth', 'Engineering', 'Leadership', 'Finance'];
+
+const mockCourses: Course[] = [
+  {
+    course_id: '1',
+    title: 'Fundraising Masterclass: From Seed to Series A',
+    description: 'Learn the art and science of raising venture capital from experienced founders and investors.',
+    instructor: 'Alex Rivera',
+    category: 'Fundraising',
+    difficulty: 'intermediate',
+    duration_hours: 8,
+    lessons_count: 24,
+    enrolled_count: 2340,
+    avg_rating: 4.9,
+    tags: ['VC', 'Pitch Deck', 'Term Sheets'],
+    price: 0,
+    is_free: true,
+  },
+  {
+    course_id: '2',
+    title: 'Product-Market Fit: Finding Your First 100 Customers',
+    description: 'A practical guide to validating your startup idea and acquiring early adopters.',
+    instructor: 'Maya Patel',
+    category: 'Product',
+    difficulty: 'beginner',
+    duration_hours: 6,
+    lessons_count: 18,
+    enrolled_count: 3120,
+    avg_rating: 4.8,
+    tags: ['PMF', 'Customer Discovery', 'MVP'],
+    price: 49,
+    is_free: false,
+  },
+  {
+    course_id: '3',
+    title: 'Growth Hacking for Startups',
+    description: 'Data-driven strategies to scale your startup from zero to millions of users.',
+    instructor: 'Jake Thompson',
+    category: 'Growth',
+    difficulty: 'intermediate',
+    duration_hours: 10,
+    lessons_count: 32,
+    enrolled_count: 1890,
+    avg_rating: 4.7,
+    tags: ['Acquisition', 'Retention', 'Analytics'],
+    price: 79,
+    is_free: false,
+  },
+  {
+    course_id: '4',
+    title: 'Technical Leadership for Startup CTOs',
+    description: 'How to build and lead engineering teams in fast-growing startups.',
+    instructor: 'David Kim',
+    category: 'Engineering',
+    difficulty: 'advanced',
+    duration_hours: 12,
+    lessons_count: 28,
+    enrolled_count: 980,
+    avg_rating: 4.9,
+    tags: ['Team Building', 'Architecture', 'Scaling'],
+    price: 99,
+    is_free: false,
+  },
+  {
+    course_id: '5',
+    title: 'Startup Finance Fundamentals',
+    description: 'Essential financial skills every founder needs to know.',
+    instructor: 'Lisa Chen',
+    category: 'Finance',
+    difficulty: 'beginner',
+    duration_hours: 5,
+    lessons_count: 15,
+    enrolled_count: 2100,
+    avg_rating: 4.6,
+    tags: ['Accounting', 'Budgeting', 'Metrics'],
+    price: 0,
+    is_free: true,
+  },
+];
 
 export default function LearningScreen() {
   const router = useRouter();
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [enrolledCourses, setEnrolledCourses] = useState<string[]>([]);
+
+  const fetchCourses = async () => {
+    try {
+      const response = await api.get<Course[]>('/courses');
+      setCourses(response.data);
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+      // Use mock data
+      setCourses(mockCourses);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCourses();
+  }, []);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchCourses();
+  }, []);
+
+  const filteredCourses = selectedCategory === 'all'
+    ? courses
+    : courses.filter(c => c.category === selectedCategory);
+
+  const handleEnroll = (courseId: string) => {
+    if (enrolledCourses.includes(courseId)) {
+      // Already enrolled - open course
+      alert('Opening course... (Demo mode)');
+    } else {
+      setEnrolledCourses([...enrolledCourses, courseId]);
+      alert('Successfully enrolled!');
+    }
+  };
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'beginner': return '#10B981';
+      case 'intermediate': return '#F59E0B';
+      case 'advanced': return '#EF4444';
+      default: return '#6B7280';
+    }
+  };
+
+  const renderCourseCard = ({ item }: { item: Course }) => {
+    const isEnrolled = enrolledCourses.includes(item.course_id);
+    
+    return (
+      <TouchableOpacity 
+        style={styles.courseCard}
+        onPress={() => handleEnroll(item.course_id)}
+      >
+        {/* Thumbnail placeholder */}
+        <View style={styles.thumbnail}>
+          <Ionicons name="play-circle" size={48} color="#6366F1" />
+        </View>
+
+        <View style={styles.courseContent}>
+          <View style={styles.courseHeader}>
+            <View style={[
+              styles.difficultyBadge,
+              { backgroundColor: getDifficultyColor(item.difficulty) + '20' }
+            ]}>
+              <Text style={[
+                styles.difficultyText,
+                { color: getDifficultyColor(item.difficulty) }
+              ]}>
+                {item.difficulty.charAt(0).toUpperCase() + item.difficulty.slice(1)}
+              </Text>
+            </View>
+            {item.is_free ? (
+              <View style={styles.freeBadge}>
+                <Text style={styles.freeText}>FREE</Text>
+              </View>
+            ) : (
+              <Text style={styles.price}>${item.price}</Text>
+            )}
+          </View>
+
+          <Text style={styles.courseTitle}>{item.title}</Text>
+          <Text style={styles.courseDescription} numberOfLines={2}>
+            {item.description}
+          </Text>
+
+          <View style={styles.instructorRow}>
+            <View style={styles.instructorAvatar}>
+              <Text style={styles.instructorInitial}>
+                {item.instructor.charAt(0)}
+              </Text>
+            </View>
+            <Text style={styles.instructorName}>{item.instructor}</Text>
+          </View>
+
+          <View style={styles.courseStats}>
+            <View style={styles.courseStat}>
+              <Ionicons name="star" size={14} color="#F59E0B" />
+              <Text style={styles.courseStatText}>{item.avg_rating}</Text>
+            </View>
+            <View style={styles.courseStat}>
+              <Ionicons name="people-outline" size={14} color="#9CA3AF" />
+              <Text style={styles.courseStatText}>{item.enrolled_count.toLocaleString()}</Text>
+            </View>
+            <View style={styles.courseStat}>
+              <Ionicons name="time-outline" size={14} color="#9CA3AF" />
+              <Text style={styles.courseStatText}>{item.duration_hours}h</Text>
+            </View>
+            <View style={styles.courseStat}>
+              <Ionicons name="book-outline" size={14} color="#9CA3AF" />
+              <Text style={styles.courseStatText}>{item.lessons_count} lessons</Text>
+            </View>
+          </View>
+
+          <View style={styles.tagsContainer}>
+            {item.tags.slice(0, 3).map((tag, index) => (
+              <View key={index} style={styles.tag}>
+                <Text style={styles.tagText}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+
+          <TouchableOpacity 
+            style={[styles.enrollButton, isEnrolled && styles.enrolledButton]}
+            onPress={() => handleEnroll(item.course_id)}
+          >
+            <Ionicons 
+              name={isEnrolled ? 'play' : 'add-circle-outline'} 
+              size={18} 
+              color="#FFFFFF" 
+            />
+            <Text style={styles.enrollButtonText}>
+              {isEnrolled ? 'Continue Learning' : 'Enroll Now'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  if (loading) {
+    return <LoadingScreen message="Loading courses..." />;
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -14,38 +263,68 @@ export default function LearningScreen() {
           <Ionicons name="arrow-back" size={24} color="#F9FAFB" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Learning</Text>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity>
+          <Ionicons name="bookmark-outline" size={24} color="#F9FAFB" />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.placeholderContainer}>
-          <View style={styles.iconContainer}>
-            <Ionicons name="book-outline" size={64} color="#EC4899" />
-          </View>
-          <Text style={styles.title}>Learning Coming Soon</Text>
-          <Text style={styles.description}>
-            Access curated courses and resources to level up your startup skills. From fundraising to product management, we've got you covered.
-          </Text>
-          <View style={styles.featureList}>
-            <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-              <Text style={styles.featureText}>Video courses from experts</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-              <Text style={styles.featureText}>Track your progress</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-              <Text style={styles.featureText}>Earn certificates</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-              <Text style={styles.featureText}>Community discussions</Text>
-            </View>
-          </View>
+      {/* Stats Banner */}
+      <View style={styles.statsBanner}>
+        <View style={styles.bannerStat}>
+          <Text style={styles.bannerStatValue}>{enrolledCourses.length}</Text>
+          <Text style={styles.bannerStatLabel}>Enrolled</Text>
         </View>
-      </ScrollView>
+        <View style={styles.bannerDivider} />
+        <View style={styles.bannerStat}>
+          <Text style={styles.bannerStatValue}>0</Text>
+          <Text style={styles.bannerStatLabel}>Completed</Text>
+        </View>
+        <View style={styles.bannerDivider} />
+        <View style={styles.bannerStat}>
+          <Text style={styles.bannerStatValue}>0</Text>
+          <Text style={styles.bannerStatLabel}>Certificates</Text>
+        </View>
+      </View>
+
+      {/* Category Filters */}
+      <FlatList
+        horizontal
+        data={categories}
+        keyExtractor={(item) => item}
+        showsHorizontalScrollIndicator={false}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={[styles.filterChip, selectedCategory === item && styles.filterChipActive]}
+            onPress={() => setSelectedCategory(item)}
+          >
+            <Text style={[styles.filterText, selectedCategory === item && styles.filterTextActive]}>
+              {item === 'all' ? 'All Courses' : item}
+            </Text>
+          </TouchableOpacity>
+        )}
+        contentContainerStyle={styles.filtersList}
+      />
+
+      <FlatList
+        data={filteredCourses}
+        keyExtractor={(item) => item.course_id}
+        renderItem={renderCourseCard}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#6366F1"
+          />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Ionicons name="book-outline" size={64} color="#374151" />
+            <Text style={styles.emptyTitle}>No courses found</Text>
+            <Text style={styles.emptyText}>Try a different category</Text>
+          </View>
+        }
+      />
     </SafeAreaView>
   );
 }
@@ -69,49 +348,198 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#F9FAFB',
   },
-  content: {
-    padding: 24,
+  statsBanner: {
+    flexDirection: 'row',
+    backgroundColor: '#1F2937',
+    marginHorizontal: 16,
+    marginVertical: 12,
+    padding: 16,
+    borderRadius: 12,
   },
-  placeholderContainer: {
+  bannerStat: {
+    flex: 1,
     alignItems: 'center',
-    paddingVertical: 40,
   },
-  iconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#EC489920',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
-  title: {
+  bannerStatValue: {
     fontSize: 24,
     fontWeight: '700',
     color: '#F9FAFB',
+  },
+  bannerStatLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  bannerDivider: {
+    width: 1,
+    backgroundColor: '#374151',
+  },
+  filtersList: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#1F2937',
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  filterChipActive: {
+    backgroundColor: '#6366F1',
+  },
+  filterText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  filterTextActive: {
+    color: '#FFFFFF',
+  },
+  listContent: {
+    padding: 16,
+  },
+  courseCard: {
+    backgroundColor: '#1F2937',
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  thumbnail: {
+    height: 140,
+    backgroundColor: '#374151',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  courseContent: {
+    padding: 16,
+  },
+  courseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  difficultyBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  difficultyText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  freeBadge: {
+    backgroundColor: '#10B98120',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  freeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#10B981',
+  },
+  price: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#F9FAFB',
+  },
+  courseTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#F9FAFB',
+    marginBottom: 8,
+  },
+  courseDescription: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    lineHeight: 20,
     marginBottom: 12,
   },
-  description: {
-    fontSize: 16,
-    color: '#9CA3AF',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 32,
-  },
-  featureList: {
-    gap: 16,
-    width: '100%',
-  },
-  featureItem: {
+  instructorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1F2937',
-    padding: 16,
-    borderRadius: 12,
-    gap: 12,
+    marginBottom: 12,
   },
-  featureText: {
-    fontSize: 15,
+  instructorAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#6366F1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  instructorInitial: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  instructorName: {
+    fontSize: 14,
     color: '#E5E7EB',
+    marginLeft: 8,
+  },
+  courseStats: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 12,
+  },
+  courseStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  courseStatText: {
+    fontSize: 13,
+    color: '#9CA3AF',
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  tag: {
+    backgroundColor: '#374151',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  tagText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  enrollButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#6366F1',
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  enrolledButton: {
+    backgroundColor: '#10B981',
+  },
+  enrollButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#F9FAFB',
+    marginTop: 16,
+  },
+  emptyText: {
+    fontSize: 15,
+    color: '#9CA3AF',
+    marginTop: 8,
   },
 });
