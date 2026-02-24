@@ -476,14 +476,15 @@ class BackendTester:
             return False
 
     async def test_discovery(self, email: str) -> bool:
-        """Test user discovery"""
+        """Test user discovery with role filters"""
         if email not in self.tokens:
-            self.log_result(f"Discovery ({email})", False, "No token available")
+            self.log_result(f"User Discovery ({email})", False, "No token available")
             return False
             
         try:
+            # Test user discovery with role filter
             response = await self.client.get(
-                f"{API_BASE}/discover",
+                f"{API_BASE}/users?role=investor&limit=10",
                 headers={"Authorization": f"Bearer {self.tokens[email]}"}
             )
             
@@ -491,14 +492,14 @@ class BackendTester:
                 data = response.json()
                 if isinstance(data, list):
                     self.log_result(
-                        f"Discovery ({email})",
+                        f"User Discovery ({email})",
                         True,
-                        f"Discovery returned {len(data)} potential connections"
+                        f"User discovery returned {len(data)} users with role filter"
                     )
                     return True
                 else:
                     self.log_result(
-                        f"Discovery ({email})",
+                        f"User Discovery ({email})",
                         False,
                         "Response is not a list of users",
                         data
@@ -507,16 +508,132 @@ class BackendTester:
             else:
                 data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
                 self.log_result(
-                    f"Discovery ({email})",
+                    f"User Discovery ({email})",
                     False,
-                    f"HTTP {response.status_code}: {data.get('detail', 'Discovery failed')}",
+                    f"HTTP {response.status_code}: {data.get('detail', 'User discovery failed')}",
                     data
                 )
                 return False
                 
         except Exception as e:
             self.log_result(
-                f"Discovery ({email})",
+                f"User Discovery ({email})",
+                False,
+                f"Exception: {str(e)}"
+            )
+            return False
+
+    async def test_get_opportunities(self, email: str = None) -> bool:
+        """Test get opportunities"""
+        headers = {}
+        if email and email in self.tokens:
+            headers["Authorization"] = f"Bearer {self.tokens[email]}"
+            
+        try:
+            response = await self.client.get(
+                f"{API_BASE}/opportunities",
+                headers=headers
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list):
+                    self.log_result(
+                        "Get Opportunities",
+                        True,
+                        f"Retrieved {len(data)} opportunities successfully"
+                    )
+                    return True
+                else:
+                    self.log_result(
+                        "Get Opportunities",
+                        False,
+                        "Response is not a list of opportunities",
+                        data
+                    )
+                    return False
+            else:
+                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
+                self.log_result(
+                    "Get Opportunities",
+                    False,
+                    f"HTTP {response.status_code}: {data.get('detail', 'Get opportunities failed')}",
+                    data
+                )
+                return False
+                
+        except Exception as e:
+            self.log_result(
+                "Get Opportunities",
+                False,
+                f"Exception: {str(e)}"
+            )
+            return False
+
+    async def test_create_opportunity(self, email: str) -> bool:
+        """Test create opportunity"""
+        if email not in self.tokens:
+            self.log_result(f"Create Opportunity ({email})", False, "No token available")
+            return False
+            
+        opportunity_data = {
+            "type": "cofounder",
+            "title": "Co-Founder - CTO Needed for AI Startup",
+            "description": "Seeking a technical co-founder to lead product development for our revolutionary AI platform that connects entrepreneurs. Must have strong background in AI/ML and startup experience.",
+            "requirements": [
+                "5+ years software engineering experience",
+                "Experience with AI/ML technologies",
+                "Previous startup experience preferred",
+                "Strong leadership and team building skills"
+            ],
+            "skills_required": ["Python", "Machine Learning", "Product Management", "Leadership"],
+            "location": "San Francisco, CA",
+            "remote_ok": True,
+            "compensation_type": "equity",
+            "compensation_details": "Significant equity package as co-founder",
+            "commitment": "full_time"
+        }
+        
+        try:
+            response = await self.client.post(
+                f"{API_BASE}/opportunities",
+                json=opportunity_data,
+                headers={
+                    "Authorization": f"Bearer {self.tokens[email]}",
+                    "Content-Type": "application/json"
+                }
+            )
+            
+            if response.status_code == 200 or response.status_code == 201:
+                data = response.json()
+                if "opportunity_id" in data:
+                    self.log_result(
+                        f"Create Opportunity ({email})",
+                        True,
+                        f"Opportunity created successfully: {data['opportunity_id']}"
+                    )
+                    return True
+                else:
+                    self.log_result(
+                        f"Create Opportunity ({email})",
+                        False,
+                        "Missing opportunity_id in response",
+                        data
+                    )
+                    return False
+            else:
+                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
+                self.log_result(
+                    f"Create Opportunity ({email})",
+                    False,
+                    f"HTTP {response.status_code}: {data.get('detail', 'Create opportunity failed')}",
+                    data
+                )
+                return False
+                
+        except Exception as e:
+            self.log_result(
+                f"Create Opportunity ({email})",
                 False,
                 f"Exception: {str(e)}"
             )
