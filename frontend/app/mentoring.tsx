@@ -59,65 +59,12 @@ export default function MentoringScreen() {
       setMentors(response.data);
     } catch (error) {
       console.error('Error fetching mentors:', error);
-      // Use mock data for now
-      setMentors([
-        {
-          user_id: '1',
-          name: 'Sarah Johnson',
-          email: 'sarah@example.com',
-          profile: {
-            headline: 'Serial Entrepreneur | 3x Founder | YC Alum',
-            bio: '15+ years building startups from 0 to IPO',
-            skills: ['Fundraising', 'Product Strategy', 'Team Building'],
-            location: 'San Francisco, CA',
-          },
-          mentor_info: {
-            expertise: ['Fundraising', 'Product Strategy', 'Team Building'],
-            hourly_rate: 150,
-            availability: 'Weekdays',
-            total_sessions: 124,
-            avg_rating: 4.9,
-          },
-        },
-        {
-          user_id: '2',
-          name: 'Michael Chen',
-          email: 'michael@example.com',
-          profile: {
-            headline: 'Tech Lead @ Google | Startup Advisor',
-            bio: 'Helping founders build scalable tech',
-            skills: ['System Design', 'Engineering Leadership', 'AI/ML'],
-            location: 'New York, NY',
-          },
-          mentor_info: {
-            expertise: ['Engineering', 'System Design', 'AI/ML'],
-            hourly_rate: 200,
-            availability: 'Weekends',
-            total_sessions: 89,
-            avg_rating: 4.8,
-          },
-        },
-        {
-          user_id: '3',
-          name: 'Emily Rodriguez',
-          email: 'emily@example.com',
-          profile: {
-            headline: 'Growth Expert | Ex-Uber, Ex-Airbnb',
-            bio: 'Scaled multiple products from 0 to millions',
-            skills: ['Growth Hacking', 'Marketing', 'Analytics'],
-            location: 'Austin, TX',
-          },
-          mentor_info: {
-            expertise: ['Growth', 'Marketing', 'Analytics'],
-            hourly_rate: 175,
-            availability: 'Flexible',
-            total_sessions: 156,
-            avg_rating: 4.95,
-          },
-        },
-      ]);
+      setMentors([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
+    }
+  };;
       setRefreshing(false);
     }
   };
