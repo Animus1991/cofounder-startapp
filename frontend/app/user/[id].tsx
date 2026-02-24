@@ -1,228 +1,213 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuthStore } from '../../src/store/authStore';
-import { User, Post } from '../../src/types';
+import { User, UserRole } from '../../src/types';
 import { Avatar } from '../../src/components/Avatar';
 import { RoleBadge } from '../../src/components/RoleBadge';
-import { PostCard } from '../../src/components/PostCard';
 import { Button } from '../../src/components/Button';
 import { LoadingScreen } from '../../src/components/LoadingScreen';
 import { formatNumber, formatDate } from '../../src/utils/helpers';
 import api from '../../src/utils/api';
 
 export default function UserProfileScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const { user: currentUser } = useAuthStore();
   const [user, setUser] = useState<User | null>(null);
-  const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'none' | 'pending' | 'connected'>('none');
-  const [connectionModalVisible, setConnectionModalVisible] = useState(false);
-  const [connectionMessage, setConnectionMessage] = useState('');
-  const [sendingRequest, setSendingRequest] = useState(false);
 
-  const isOwnProfile = currentUser?.user_id === id;
+  const fetchUser = async () => {
+    try {
+      const response = await api.get<User>(`/users/${id}`);
+      setUser(response.data);
+    } catch (error) {
+      console.error('Error fetching user:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [userResponse, postsResponse] = await Promise.all([
-          api.get<User>(`/users/${id}`),
-          api.get<Post[]>(`/posts?user_id=${id}`),
-        ]);
-        
-        setUser(userResponse.data);
-        setPosts(postsResponse.data);
-
-        // Check connection status
-        if (!isOwnProfile) {
-          try {
-            const connectionsResponse = await api.get('/connections');
-            const connection = connectionsResponse.data.find(
-              (c: any) => c.other_user?.user_id === id
-            );
-            if (connection) {
-              setConnectionStatus(connection.status === 'accepted' ? 'connected' : 'pending');
-            }
-          } catch (e) {
-            // Not authenticated or no connections
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching user:', error);
-        Alert.alert('Error', 'User not found');
-        router.back();
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (id) fetchData();
+    if (id) {
+      fetchUser();
+    }
   }, [id]);
 
   const handleConnect = async () => {
-    setSendingRequest(true);
     try {
-      await api.post('/connections/request', {
-        target_user_id: id,
-        message: connectionMessage || undefined,
+      await api.post('/intro-requests', {
+        to_user_id: id,
+        message: `Hi ${user?.name}, I'd like to connect with you!`
       });
       setConnectionStatus('pending');
-      setConnectionModalVisible(false);
-      setConnectionMessage('');
-    } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to send request');
-    } finally {
-      setSendingRequest(false);
-    }
-  };
-
-  const handleLike = async (postId: string) => {
-    try {
-      await api.post(`/posts/${postId}/like`);
     } catch (error) {
-      console.error('Error liking post:', error);
+      console.error('Error sending connection request:', error);
     }
   };
 
-  const handleComment = async (postId: string, content: string) => {
+  const handleMessage = async () => {
     try {
-      await api.post(`/posts/${postId}/comment`, { content });
+      // Create or get existing conversation
+      const response = await api.post('/conversations', {
+        participant_ids: [id]
+      });
+      router.push(`/chat/${response.data.conversation_id}`);
     } catch (error) {
-      console.error('Error commenting:', error);
+      console.error('Error starting conversation:', error);
     }
   };
 
-  if (loading || !user) {
+  if (loading) {
     return <LoadingScreen message="Loading profile..." />;
   }
 
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#F9FAFB" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.errorState}>
+          <Ionicons name="person-outline" size={64} color="#374151" />
+          <Text style={styles.errorTitle}>User not found</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const profile = user.profile || {};
+  const role = user.roles?.[0] as UserRole || 'founder';
+  const isOwnProfile = currentUser?.user_id === user.user_id;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#F9FAFB" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity style={styles.moreButton}>
-          <Ionicons name="ellipsis-horizontal" size={24} color="#F9FAFB" />
-        </TouchableOpacity>
-      </View>
-
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.headerNav}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#F9FAFB" />
+          </TouchableOpacity>
+          <TouchableOpacity>
+            <Ionicons name="ellipsis-horizontal" size={24} color="#F9FAFB" />
+          </TouchableOpacity>
+        </View>
+
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           {/* Cover Image */}
-          {user.cover_image ? (
-            <Image source={{ uri: user.cover_image }} style={styles.coverImage} />
-          ) : (
-            <View style={styles.coverPlaceholder} />
-          )}
+          <View style={styles.coverContainer}>
+            {profile.cover_image ? (
+              <Image source={{ uri: profile.cover_image }} style={styles.coverImage} />
+            ) : (
+              <View style={styles.coverPlaceholder} />
+            )}
+          </View>
 
           {/* Profile Info */}
-          <View style={styles.profileInfo}>
-            <Avatar uri={user.profile_image} name={user.name} size={100} style={styles.avatar} />
-            
+          <View style={styles.profileSection}>
+            <Avatar uri={profile.profile_image} name={user.name} size={100} />
+
             <View style={styles.nameSection}>
               <Text style={styles.name}>{user.name}</Text>
-              <RoleBadge role={user.role as any} size="medium" />
+              <RoleBadge role={role} size="medium" />
             </View>
 
-            {user.headline && (
-              <Text style={styles.headline}>{user.headline}</Text>
+            {profile.headline && (
+              <Text style={styles.headline}>{profile.headline}</Text>
             )}
 
-            {user.location && (
+            {profile.location && (
               <View style={styles.locationRow}>
                 <Ionicons name="location-outline" size={16} color="#9CA3AF" />
-                <Text style={styles.location}>{user.location}</Text>
+                <Text style={styles.location}>{profile.location}</Text>
               </View>
             )}
 
             {/* Stats */}
             <View style={styles.statsRow}>
               <View style={styles.stat}>
-                <Text style={styles.statNumber}>{formatNumber(user.connection_count)}</Text>
+                <Text style={styles.statNumber}>{formatNumber(user.connection_count || 0)}</Text>
                 <Text style={styles.statLabel}>Connections</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.stat}>
-                <Text style={styles.statNumber}>{formatNumber(user.post_count)}</Text>
+                <Text style={styles.statNumber}>{formatNumber(user.post_count || 0)}</Text>
                 <Text style={styles.statLabel}>Posts</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.stat}>
+                <Text style={styles.statNumber}>{user.trust_score || 0}</Text>
+                <Text style={styles.statLabel}>Trust Score</Text>
               </View>
             </View>
 
             {/* Action Buttons */}
             {!isOwnProfile && (
               <View style={styles.actionButtons}>
-                {connectionStatus === 'connected' ? (
-                  <>
-                    <Button
-                      title="Message"
-                      onPress={() => router.push(`/chat/${user.user_id}`)}
-                      style={styles.messageButton}
-                      icon={<Ionicons name="chatbubble-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />}
-                    />
-                    <Button
-                      title="Connected"
-                      onPress={() => {}}
-                      variant="outline"
-                      style={styles.connectedButton}
-                      icon={<Ionicons name="checkmark" size={18} color="#10B981" style={{ marginRight: 8 }} />}
-                    />
-                  </>
-                ) : connectionStatus === 'pending' ? (
-                  <Button
-                    title="Request Sent"
-                    onPress={() => {}}
-                    variant="secondary"
-                    disabled
-                    style={styles.fullButton}
-                    icon={<Ionicons name="time-outline" size={18} color="#9CA3AF" style={{ marginRight: 8 }} />}
-                  />
-                ) : (
+                {connectionStatus === 'none' && (
                   <Button
                     title="Connect"
-                    onPress={() => setConnectionModalVisible(true)}
-                    style={styles.fullButton}
-                    icon={<Ionicons name="person-add-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />}
+                    onPress={handleConnect}
+                    style={styles.connectButton}
                   />
                 )}
+                {connectionStatus === 'pending' && (
+                  <Button
+                    title="Pending"
+                    variant="outline"
+                    disabled
+                    style={styles.connectButton}
+                  />
+                )}
+                {connectionStatus === 'connected' && (
+                  <Button
+                    title="Connected"
+                    variant="outline"
+                    style={styles.connectButton}
+                  />
+                )}
+                <Button
+                  title="Message"
+                  variant="outline"
+                  onPress={handleMessage}
+                  style={styles.messageButton}
+                />
               </View>
             )}
           </View>
         </View>
 
         {/* Bio Section */}
-        {user.bio && (
+        {profile.bio && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About</Text>
-            <Text style={styles.bioText}>{user.bio}</Text>
+            <Text style={styles.bioText}>{profile.bio}</Text>
           </View>
         )}
 
         {/* Looking For */}
-        {user.looking_for && (
+        {profile.looking_for && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Looking For</Text>
             <View style={styles.lookingForCard}>
               <Ionicons name="search" size={20} color="#6366F1" />
-              <Text style={styles.lookingForText}>{user.looking_for}</Text>
+              <Text style={styles.lookingForText}>{profile.looking_for}</Text>
             </View>
           </View>
         )}
 
         {/* Skills */}
-        {user.skills.length > 0 && (
+        {profile.skills && profile.skills.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Skills</Text>
             <View style={styles.tagsContainer}>
-              {user.skills.map((skill, index) => (
+              {profile.skills.map((skill, index) => (
                 <View key={index} style={styles.tag}>
                   <Text style={styles.tagText}>{skill}</Text>
                 </View>
@@ -232,11 +217,11 @@ export default function UserProfileScreen() {
         )}
 
         {/* Interests */}
-        {user.interests.length > 0 && (
+        {profile.interests && profile.interests.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Interests</Text>
             <View style={styles.tagsContainer}>
-              {user.interests.map((interest, index) => (
+              {profile.interests.map((interest, index) => (
                 <View key={index} style={[styles.tag, styles.interestTag]}>
                   <Text style={[styles.tagText, styles.interestTagText]}>{interest}</Text>
                 </View>
@@ -245,69 +230,47 @@ export default function UserProfileScreen() {
           </View>
         )}
 
-        {/* Posts */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Posts</Text>
-          {posts.length > 0 ? (
-            posts.map((post) => (
-              <PostCard
-                key={post.post_id}
-                post={post}
-                onLike={handleLike}
-                onComment={handleComment}
-                onUserPress={() => {}}
-                onPostPress={(postId) => router.push(`/post/${postId}`)}
-              />
-            ))
-          ) : (
-            <View style={styles.noPostsContainer}>
-              <Ionicons name="document-text-outline" size={48} color="#374151" />
-              <Text style={styles.noPostsText}>No posts yet</Text>
-            </View>
-          )}
-        </View>
-      </ScrollView>
-
-      {/* Connection Request Modal */}
-      <Modal
-        visible={connectionModalVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setConnectionModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Connect with {user.name}</Text>
-            <Text style={styles.modalSubtitle}>
-              Add a personalized message to increase your chances of connecting
-            </Text>
-            <TextInput
-              style={styles.messageInput}
-              placeholder="Hi! I'd love to connect because..."
-              placeholderTextColor="#6B7280"
-              value={connectionMessage}
-              onChangeText={setConnectionMessage}
-              multiline
-              numberOfLines={4}
-              maxLength={300}
-            />
-            <View style={styles.modalButtons}>
-              <Button
-                title="Cancel"
-                onPress={() => setConnectionModalVisible(false)}
-                variant="ghost"
-                style={styles.modalButton}
-              />
-              <Button
-                title="Send Request"
-                onPress={handleConnect}
-                loading={sendingRequest}
-                style={styles.modalButton}
-              />
+        {/* Sectors */}
+        {profile.sectors && profile.sectors.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Sectors</Text>
+            <View style={styles.tagsContainer}>
+              {profile.sectors.map((sector, index) => (
+                <View key={index} style={[styles.tag, styles.sectorTag]}>
+                  <Text style={[styles.tagText, styles.sectorTagText]}>{sector}</Text>
+                </View>
+              ))}
             </View>
           </View>
+        )}
+
+        {/* Links */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Links</Text>
+          <View style={styles.linksContainer}>
+            {profile.linkedin_url && (
+              <TouchableOpacity style={styles.linkButton}>
+                <Ionicons name="logo-linkedin" size={20} color="#0A66C2" />
+                <Text style={styles.linkText}>LinkedIn</Text>
+              </TouchableOpacity>
+            )}
+            {profile.website && (
+              <TouchableOpacity style={styles.linkButton}>
+                <Ionicons name="globe-outline" size={20} color="#6366F1" />
+                <Text style={styles.linkText}>Website</Text>
+              </TouchableOpacity>
+            )}
+            {profile.twitter_url && (
+              <TouchableOpacity style={styles.linkButton}>
+                <Ionicons name="logo-twitter" size={20} color="#1DA1F2" />
+                <Text style={styles.linkText}>Twitter</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </Modal>
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -318,24 +281,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#111827',
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1F2937',
   },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#F9FAFB',
-  },
-  moreButton: {
-    padding: 4,
+  headerNav: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
   profileHeader: {
     backgroundColor: '#1F2937',
@@ -343,23 +302,22 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 24,
     marginBottom: 16,
   },
+  coverContainer: {
+    height: 140,
+  },
   coverImage: {
     width: '100%',
-    height: 140,
+    height: '100%',
   },
   coverPlaceholder: {
-    height: 140,
+    flex: 1,
     backgroundColor: '#374151',
   },
-  profileInfo: {
+  profileSection: {
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingBottom: 24,
     marginTop: -50,
-  },
-  avatar: {
-    borderWidth: 4,
-    borderColor: '#1F2937',
   },
   nameSection: {
     flexDirection: 'row',
@@ -393,19 +351,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 20,
-    paddingHorizontal: 32,
+    paddingHorizontal: 16,
   },
   stat: {
     flex: 1,
     alignItems: 'center',
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
     color: '#F9FAFB',
   },
   statLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#6B7280',
     marginTop: 2,
   },
@@ -416,18 +374,13 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     flexDirection: 'row',
-    gap: 12,
     marginTop: 20,
-    width: '100%',
+    gap: 12,
+  },
+  connectButton: {
+    flex: 1,
   },
   messageButton: {
-    flex: 1,
-  },
-  connectedButton: {
-    flex: 1,
-    borderColor: '#10B981',
-  },
-  fullButton: {
     flex: 1,
   },
   section: {
@@ -481,55 +434,40 @@ const styles = StyleSheet.create({
   interestTagText: {
     color: '#10B981',
   },
-  noPostsContainer: {
-    alignItems: 'center',
-    padding: 40,
-    backgroundColor: '#1F2937',
-    borderRadius: 16,
+  sectorTag: {
+    backgroundColor: '#F59E0B20',
   },
-  noPostsText: {
-    fontSize: 15,
-    color: '#6B7280',
-    marginTop: 12,
+  sectorTagText: {
+    color: '#F59E0B',
   },
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#1F2937',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#F9FAFB',
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    marginBottom: 16,
-  },
-  messageInput: {
-    backgroundColor: '#374151',
-    borderRadius: 12,
-    padding: 16,
-    color: '#F9FAFB',
-    fontSize: 15,
-    minHeight: 100,
-    textAlignVertical: 'top',
-    marginBottom: 16,
-  },
-  modalButtons: {
+  linksContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
   },
-  modalButton: {
+  linkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1F2937',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  linkText: {
+    fontSize: 14,
+    color: '#E5E7EB',
+    fontWeight: '500',
+  },
+  errorState: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#F9FAFB',
+    marginTop: 16,
   },
 });
