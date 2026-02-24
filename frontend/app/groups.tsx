@@ -77,7 +77,7 @@ export default function GroupsScreen() {
 
     setSubmitting(true);
     try {
-      await api.post('/groups', {
+      const response = await api.post('/groups', {
         name: newGroupName,
         description: newGroupDescription,
         category: newGroupCategory,
@@ -86,26 +86,11 @@ export default function GroupsScreen() {
       setCreateModalVisible(false);
       setNewGroupName('');
       setNewGroupDescription('');
-      fetchGroups();
+      // Add the new group to local state
+      setGroups([response.data, ...groups]);
     } catch (error) {
-      // Demo mode
-      const newGroup: Group = {
-        group_id: `new-${Date.now()}`,
-        name: newGroupName,
-        description: newGroupDescription,
-        category: newGroupCategory,
-        privacy: newGroupPrivacy,
-        member_count: 1,
-        post_count: 0,
-        tags: [],
-        created_by: 'me',
-        is_member: true,
-        admins: ['me'],
-      };
-      setGroups([newGroup, ...groups]);
-      setCreateModalVisible(false);
-      setNewGroupName('');
-      setNewGroupDescription('');
+      console.error('Error creating group:', error);
+      alert('Failed to create group. Please try again.');
     } finally {
       setSubmitting(false);
     }
