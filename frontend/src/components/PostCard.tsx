@@ -5,7 +5,6 @@ import { Post, UserRole } from '../types';
 import { Avatar } from './Avatar';
 import { RoleBadge } from './RoleBadge';
 import { formatRelativeTime, formatNumber } from '../utils/helpers';
-import api from '../utils/api';
 
 interface PostCardProps {
   post: Post;
@@ -27,6 +26,13 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [isLiked, setIsLiked] = useState(post.is_liked);
   const [likesCount, setLikesCount] = useState(post.likes_count);
 
+  // Get author info from the post
+  const authorName = post.author?.name || 'Unknown';
+  const authorImage = post.author?.profile_image;
+  const authorHeadline = post.author?.headline;
+  const authorRole = post.author?.roles?.[0] as UserRole || 'founder';
+  const authorId = post.author?.user_id || post.author_id;
+
   const handleLike = async () => {
     try {
       const wasLiked = isLiked;
@@ -34,7 +40,6 @@ export const PostCard: React.FC<PostCardProps> = ({
       setLikesCount(prev => wasLiked ? prev - 1 : prev + 1);
       onLike(post.post_id);
     } catch (error) {
-      // Revert on error
       setIsLiked(isLiked);
       setLikesCount(likesCount);
     }
@@ -48,18 +53,21 @@ export const PostCard: React.FC<PostCardProps> = ({
     }
   };
 
+  // Get first image from media array if available
+  const postImage = post.media && post.media.length > 0 ? post.media[0] : null;
+
   return (
     <View style={styles.container}>
       {/* Header */}
-      <TouchableOpacity style={styles.header} onPress={() => onUserPress(post.user_id)}>
-        <Avatar uri={post.user_image} name={post.user_name} size={48} />
+      <TouchableOpacity style={styles.header} onPress={() => onUserPress(authorId)}>
+        <Avatar uri={authorImage} name={authorName} size={48} />
         <View style={styles.headerInfo}>
           <View style={styles.nameRow}>
-            <Text style={styles.userName}>{post.user_name}</Text>
-            <RoleBadge role={post.user_role as UserRole} size="small" />
+            <Text style={styles.userName}>{authorName}</Text>
+            <RoleBadge role={authorRole} size="small" />
           </View>
-          {post.user_headline && (
-            <Text style={styles.headline} numberOfLines={1}>{post.user_headline}</Text>
+          {authorHeadline && (
+            <Text style={styles.headline} numberOfLines={1}>{authorHeadline}</Text>
           )}
           <Text style={styles.time}>{formatRelativeTime(post.created_at)}</Text>
         </View>
@@ -68,9 +76,9 @@ export const PostCard: React.FC<PostCardProps> = ({
       {/* Content */}
       <TouchableOpacity onPress={() => onPostPress(post.post_id)}>
         <Text style={styles.content}>{post.content}</Text>
-        {post.image && (
+        {postImage && (
           <Image 
-            source={{ uri: post.image.startsWith('data:') ? post.image : `data:image/jpeg;base64,${post.image}` }} 
+            source={{ uri: postImage.startsWith('data:') ? postImage : postImage.startsWith('http') ? postImage : `data:image/jpeg;base64,${postImage}` }} 
             style={styles.postImage} 
             resizeMode="cover"
           />
@@ -78,7 +86,7 @@ export const PostCard: React.FC<PostCardProps> = ({
       </TouchableOpacity>
 
       {/* Tags */}
-      {post.tags.length > 0 && (
+      {post.tags && post.tags.length > 0 && (
         <View style={styles.tagsContainer}>
           {post.tags.map((tag, index) => (
             <View key={index} style={styles.tag}>
@@ -138,13 +146,17 @@ export const PostCard: React.FC<PostCardProps> = ({
       )}
 
       {/* Recent Comments */}
-      {post.comments.length > 0 && (
+      {post.comments && post.comments.length > 0 && (
         <View style={styles.commentsSection}>
           {post.comments.slice(0, 2).map((comment) => (
             <View key={comment.comment_id} style={styles.comment}>
-              <Avatar uri={comment.user_image} name={comment.user_name} size={32} />
+              <Avatar 
+                uri={comment.author?.profile?.profile_image} 
+                name={comment.author?.name || 'User'} 
+                size={32} 
+              />
               <View style={styles.commentContent}>
-                <Text style={styles.commentAuthor}>{comment.user_name}</Text>
+                <Text style={styles.commentAuthor}>{comment.author?.name || 'User'}</Text>
                 <Text style={styles.commentText}>{comment.content}</Text>
               </View>
             </View>

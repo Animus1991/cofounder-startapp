@@ -22,15 +22,22 @@ export const UserCard: React.FC<UserCardProps> = ({
   matchScore,
   matchReason
 }) => {
+  // Get profile data from user object
+  const profileImage = user.profile?.profile_image;
+  const headline = user.profile?.headline;
+  const location = user.profile?.location;
+  const skills = user.profile?.skills || [];
+  const role = user.roles?.[0] as UserRole || 'founder';
+
   return (
     <TouchableOpacity style={styles.container} onPress={onPress}>
       <View style={styles.header}>
-        <Avatar uri={user.profile_image} name={user.name} size={60} />
+        <Avatar uri={profileImage} name={user.name} size={60} />
         <View style={styles.info}>
           <Text style={styles.name}>{user.name}</Text>
-          <RoleBadge role={user.role as UserRole} size="small" />
-          {user.headline && (
-            <Text style={styles.headline} numberOfLines={2}>{user.headline}</Text>
+          <RoleBadge role={role} size="small" />
+          {headline && (
+            <Text style={styles.headline} numberOfLines={2}>{headline}</Text>
           )}
         </View>
       </View>
@@ -53,10 +60,10 @@ export const UserCard: React.FC<UserCardProps> = ({
         </View>
       )}
 
-      {/* Skills/Interests Preview */}
-      {(user.skills.length > 0 || user.interests.length > 0) && (
+      {/* Skills Preview */}
+      {skills.length > 0 && (
         <View style={styles.tagsContainer}>
-          {user.skills.slice(0, 3).map((skill, index) => (
+          {skills.slice(0, 3).map((skill, index) => (
             <View key={`skill-${index}`} style={styles.tag}>
               <Text style={styles.tagText}>{skill}</Text>
             </View>
@@ -67,17 +74,17 @@ export const UserCard: React.FC<UserCardProps> = ({
       {/* Stats */}
       <View style={styles.stats}>
         <View style={styles.stat}>
-          <Text style={styles.statNumber}>{user.connection_count}</Text>
+          <Text style={styles.statNumber}>{user.connection_count || 0}</Text>
           <Text style={styles.statLabel}>Connections</Text>
         </View>
         <View style={styles.stat}>
-          <Text style={styles.statNumber}>{user.post_count}</Text>
+          <Text style={styles.statNumber}>{user.post_count || 0}</Text>
           <Text style={styles.statLabel}>Posts</Text>
         </View>
-        {user.location && (
+        {location && (
           <View style={styles.locationContainer}>
             <Ionicons name="location-outline" size={14} color="#9CA3AF" />
-            <Text style={styles.location}>{user.location}</Text>
+            <Text style={styles.location}>{location}</Text>
           </View>
         )}
       </View>
