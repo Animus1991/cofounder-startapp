@@ -25,87 +25,6 @@ interface Group {
 
 const categories = ['all', 'Founders', 'Investors', 'Engineering', 'Product', 'Marketing', 'Industry'];
 
-const mockGroups: Group[] = [
-  {
-    group_id: '1',
-    name: 'Early Stage Founders',
-    description: 'A community for pre-seed and seed stage founders to share experiences, challenges, and victories.',
-    category: 'Founders',
-    privacy: 'public',
-    member_count: 3420,
-    post_count: 890,
-    tags: ['Pre-seed', 'Seed', 'Networking'],
-    created_by: 'admin',
-    is_member: false,
-    admins: ['admin'],
-  },
-  {
-    group_id: '2',
-    name: 'Angel Investors Network',
-    description: 'Connect with fellow angel investors, share deal flow, and discuss investment strategies.',
-    category: 'Investors',
-    privacy: 'private',
-    member_count: 890,
-    post_count: 234,
-    tags: ['Angel Investing', 'Deal Flow', 'Due Diligence'],
-    created_by: 'admin',
-    is_member: false,
-    admins: ['admin'],
-  },
-  {
-    group_id: '3',
-    name: 'Startup CTOs',
-    description: 'Technical leadership discussions, architecture decisions, and engineering team management.',
-    category: 'Engineering',
-    privacy: 'public',
-    member_count: 2100,
-    post_count: 567,
-    tags: ['CTO', 'Engineering', 'Leadership'],
-    created_by: 'admin',
-    is_member: false,
-    admins: ['admin'],
-  },
-  {
-    group_id: '4',
-    name: 'Product-Market Fit Lab',
-    description: 'Share your PMF journey, get feedback on your ideas, and learn from others experiences.',
-    category: 'Product',
-    privacy: 'public',
-    member_count: 4500,
-    post_count: 1230,
-    tags: ['PMF', 'Product', 'Validation'],
-    created_by: 'admin',
-    is_member: false,
-    admins: ['admin'],
-  },
-  {
-    group_id: '5',
-    name: 'Growth Hackers United',
-    description: 'Data-driven growth strategies, A/B testing insights, and acquisition channel discussions.',
-    category: 'Marketing',
-    privacy: 'public',
-    member_count: 2890,
-    post_count: 678,
-    tags: ['Growth', 'Marketing', 'Analytics'],
-    created_by: 'admin',
-    is_member: false,
-    admins: ['admin'],
-  },
-  {
-    group_id: '6',
-    name: 'FinTech Founders',
-    description: 'Discuss regulatory challenges, banking partnerships, and FinTech-specific growth strategies.',
-    category: 'Industry',
-    privacy: 'public',
-    member_count: 1560,
-    post_count: 345,
-    tags: ['FinTech', 'Banking', 'Regulation'],
-    created_by: 'admin',
-    is_member: false,
-    admins: ['admin'],
-  },
-];
-
 export default function GroupsScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'discover' | 'my-groups'>('discover');
@@ -126,7 +45,7 @@ export default function GroupsScreen() {
       setGroups(response.data);
     } catch (error) {
       console.error('Error fetching groups:', error);
-      setGroups(mockGroups);
+      setGroups([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
