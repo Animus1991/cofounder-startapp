@@ -244,11 +244,12 @@ class BackendTester:
             
             if response.status_code == 200:
                 data = response.json()
-                if data.get("headline") == update_data["headline"]:
+                profile = data.get("profile", {})
+                if profile.get("headline") == update_data["headline"]:
                     self.log_result(
                         f"Update Profile ({email})",
                         True,
-                        f"Profile updated successfully: {data.get('headline')}"
+                        f"Profile updated successfully: {profile.get('headline')}"
                     )
                     return True
                 else:
