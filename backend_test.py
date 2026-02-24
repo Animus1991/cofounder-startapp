@@ -432,7 +432,7 @@ class BackendTester:
         
         try:
             response = await self.client.post(
-                f"{API_BASE}/posts/{post_id}/comment",
+                f"{API_BASE}/posts/{post_id}/comments",
                 json=comment_data,
                 headers={
                     "Authorization": f"Bearer {self.tokens[email]}",
