@@ -6,9 +6,9 @@ import { useRouter } from 'expo-router';
 
 const menuItems = [
   { id: 'events', title: 'Events', icon: 'calendar-outline', color: '#6366F1', description: 'Discover startup events' },
-  { id: 'marketplace', title: 'Marketplace', icon: 'storefront-outline', color: '#10B981', description: 'Tools & services for startups' },
+  { id: 'marketplace', title: 'Marketplace', icon: 'cart-outline', color: '#10B981', description: 'Tools & services for startups' },
   { id: 'mentoring', title: 'Mentoring', icon: 'school-outline', color: '#F59E0B', description: 'Find mentors & book sessions' },
-  { id: 'learning', title: 'Learning', icon: 'book-outline', color: '#EC4899', description: 'Courses & resources' },
+  { id: 'learning', title: 'Learning', icon: 'library-outline', color: '#EC4899', description: 'Courses & resources' },
   { id: 'groups', title: 'Groups', icon: 'people-outline', color: '#8B5CF6', description: 'Join communities' },
   { id: 'profile', title: 'My Profile', icon: 'person-outline', color: '#06B6D4', description: 'View & edit your profile' },
 ];
