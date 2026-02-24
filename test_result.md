@@ -102,102 +102,104 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: Build a co-founder app - social media platform for startup ecosystem with features from Facebook and LinkedIn, including profiles, social feed, matching/discovery, messaging, and AI-powered recommendations.
+user_problem_statement: Build CoFounderBay - a specialized social network for the startup ecosystem that connects founders, investors, mentors, and professionals. Features include authentication, signal-rich profiles, opportunities board, events, marketplace, messaging, and feed with posts.
 
 backend:
-  - task: "User Authentication - Email/Password Registration & Login"
+  - task: "User Authentication (Register/Login)"
     implemented: true
-    working: true
+    working: NA
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
-      - working: true
-        agent: "main"
-        comment: "Tested registration and login endpoints - both working correctly with JWT tokens"
-
-  - task: "User Authentication - Google OAuth via Emergent Auth"
-    implemented: true
-    working: true
-    file: "/app/backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Endpoint implemented, needs browser testing for OAuth flow"
       - working: true
         agent: "testing"
-        comment: "OAuth session exchange endpoint tested and working correctly - properly validates session_id and returns appropriate error responses for invalid sessions"
+        comment: "Previously working, rewritten for v2.0"
+      - working: NA
+        agent: "main"
+        comment: "CoFounderBay v2.0 backend rewrite - needs retesting"
 
-  - task: "User Profile Management"
+  - task: "Posts CRUD (Create/Read/Like/Comment)"
     implemented: true
-    working: true
+    working: NA
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
-      - working: true
-        agent: "main"
-        comment: "Profile update and get user endpoints working"
-
-  - task: "Social Feed - Posts CRUD"
-    implemented: true
-    working: true
-    file: "/app/backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "Create post, get posts, like, comment all working"
-
-  - task: "Connections/Network Management"
-    implemented: true
-    working: true
-    file: "/app/backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "Connection request, accept, reject endpoints implemented"
-
-  - task: "Direct Messaging"
-    implemented: true
-    working: true
-    file: "/app/backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "Send message, get messages, get conversations endpoints working"
-
-  - task: "AI-Powered Recommendations"
-    implemented: true
-    working: true
-    file: "/app/backend/server.py"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "AI recommendations endpoint implemented with OpenAI GPT-4o integration via Emergent LLM key"
       - working: true
         agent: "testing"
-        comment: "AI recommendations endpoint fully functional - returns 5 personalized user recommendations with match scores and reasons using GPT-4o integration. Fallback to basic matching works when AI unavailable"
+        comment: "Previously working"
+      - working: NA
+        agent: "main"
+        comment: "Updated for v2.0 with author embedding"
 
   - task: "User Discovery/Browse"
     implemented: true
-    working: true
+    working: NA
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Previously working"
+      - working: NA
+        agent: "main"
+        comment: "Updated with match scoring and role filtering"
+
+  - task: "Opportunities Board"
+    implemented: true
+    working: NA
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "New feature for v2.0 - full opportunities CRUD with applications"
+
+  - task: "Events Management"
+    implemented: true
+    working: NA
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "New feature for v2.0 - events creation and RSVP"
+
+  - task: "Connections System"
+    implemented: true
+    working: NA
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "Added /connections endpoint and intro request flow"
+
+  - task: "Conversations/Messaging"
+    implemented: true
+    working: NA
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Previously working"
+      - working: NA
+        agent: "main"
+        comment: "v2.0 - needs retesting"
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
