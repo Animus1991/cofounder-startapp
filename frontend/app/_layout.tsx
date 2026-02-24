@@ -61,7 +61,7 @@ export default function RootLayout() {
   }, [isAuthenticated, segments, navigationState?.key, isLoading, isCheckingSession, needsOnboarding]);
 
   if (isLoading || isCheckingSession) {
-    return <LoadingScreen message="Starting CoFounder Connect..." />;
+    return <LoadingScreen message="Starting CoFounderBay..." />;
   }
 
   return (
@@ -76,6 +76,12 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="events" options={{ headerShown: false }} />
+        <Stack.Screen name="marketplace" options={{ headerShown: false }} />
+        <Stack.Screen name="mentoring" options={{ headerShown: false }} />
+        <Stack.Screen name="learning" options={{ headerShown: false }} />
+        <Stack.Screen name="groups" options={{ headerShown: false }} />
+        <Stack.Screen name="profile" options={{ headerShown: false }} />
         <Stack.Screen name="index" options={{ headerShown: false }} />
       </Stack>
     </>
