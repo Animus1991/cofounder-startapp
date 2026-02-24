@@ -24,85 +24,7 @@ interface Course {
   is_free: boolean;
 }
 
-const categories = ['all', 'Fundraising', 'Product', 'Growth', 'Engineering', 'Leadership', 'Finance'];
-
-const mockCourses: Course[] = [
-  {
-    course_id: '1',
-    title: 'Fundraising Masterclass: From Seed to Series A',
-    description: 'Learn the art and science of raising venture capital from experienced founders and investors.',
-    instructor: 'Alex Rivera',
-    category: 'Fundraising',
-    difficulty: 'intermediate',
-    duration_hours: 8,
-    lessons_count: 24,
-    enrolled_count: 2340,
-    avg_rating: 4.9,
-    tags: ['VC', 'Pitch Deck', 'Term Sheets'],
-    price: 0,
-    is_free: true,
-  },
-  {
-    course_id: '2',
-    title: 'Product-Market Fit: Finding Your First 100 Customers',
-    description: 'A practical guide to validating your startup idea and acquiring early adopters.',
-    instructor: 'Maya Patel',
-    category: 'Product',
-    difficulty: 'beginner',
-    duration_hours: 6,
-    lessons_count: 18,
-    enrolled_count: 3120,
-    avg_rating: 4.8,
-    tags: ['PMF', 'Customer Discovery', 'MVP'],
-    price: 49,
-    is_free: false,
-  },
-  {
-    course_id: '3',
-    title: 'Growth Hacking for Startups',
-    description: 'Data-driven strategies to scale your startup from zero to millions of users.',
-    instructor: 'Jake Thompson',
-    category: 'Growth',
-    difficulty: 'intermediate',
-    duration_hours: 10,
-    lessons_count: 32,
-    enrolled_count: 1890,
-    avg_rating: 4.7,
-    tags: ['Acquisition', 'Retention', 'Analytics'],
-    price: 79,
-    is_free: false,
-  },
-  {
-    course_id: '4',
-    title: 'Technical Leadership for Startup CTOs',
-    description: 'How to build and lead engineering teams in fast-growing startups.',
-    instructor: 'David Kim',
-    category: 'Engineering',
-    difficulty: 'advanced',
-    duration_hours: 12,
-    lessons_count: 28,
-    enrolled_count: 980,
-    avg_rating: 4.9,
-    tags: ['Team Building', 'Architecture', 'Scaling'],
-    price: 99,
-    is_free: false,
-  },
-  {
-    course_id: '5',
-    title: 'Startup Finance Fundamentals',
-    description: 'Essential financial skills every founder needs to know.',
-    instructor: 'Lisa Chen',
-    category: 'Finance',
-    difficulty: 'beginner',
-    duration_hours: 5,
-    lessons_count: 15,
-    enrolled_count: 2100,
-    avg_rating: 4.6,
-    tags: ['Accounting', 'Budgeting', 'Metrics'],
-    price: 0,
-    is_free: true,
-  },
-];
+const categories = ['all', 'Fundraising', 'Product', 'Growth', 'Engineering', 'Leadership', 'Finance', 'Marketing'];
 
 export default function LearningScreen() {
   const router = useRouter();
@@ -118,8 +40,7 @@ export default function LearningScreen() {
       setCourses(response.data);
     } catch (error) {
       console.error('Error fetching courses:', error);
-      // Use mock data
-      setCourses(mockCourses);
+      setCourses([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
