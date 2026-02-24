@@ -1744,13 +1744,15 @@ async def list_events(
     query = {}
     if event_type:
         query["event_type"] = event_type
+    # For upcoming, we compare with ISO string since dates are stored as strings
     if upcoming:
-        query["start_time"] = {"$gte": datetime.now(timezone.utc)}
+        now_str = datetime.now(timezone.utc).isoformat()
+        query["start_time"] = {"$gte": now_str}
     
     events = await db.events.find(query, {"_id": 0}).sort("start_time", 1).skip(skip).limit(limit).to_list(limit)
     
     for event in events:
-        organizer = await db.users.find_one({"user_id": event["organizer_id"]}, {"_id": 0, "name": 1, "profile.profile_image": 1})
+        organizer = await db.users.find_one({"user_id": event.get("organizer_id")}, {"_id": 0, "name": 1, "profile.profile_image": 1})
         event["organizer"] = organizer
     
     return events
