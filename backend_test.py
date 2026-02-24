@@ -184,10 +184,12 @@ class BackendTester:
             if response.status_code == 200:
                 data = response.json()
                 if "user_id" in data and "email" in data:
+                    roles = data.get('roles', [])
+                    role_str = roles[0] if roles else 'no role'
                     self.log_result(
                         f"Get Profile ({email})",
                         True,
-                        f"Profile retrieved: {data['name']} ({data['role']})"
+                        f"Profile retrieved: {data['name']} ({role_str})"
                     )
                     return True
                 else:
