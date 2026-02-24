@@ -14,12 +14,12 @@ import uuid
 BASE_URL = "https://startup-connect-53.preview.emergentagent.com"
 API_BASE = f"{BASE_URL}/api"
 
-# Test data - using realistic startup-related data
+# Test data - using the exact test user from the request
 TEST_USERS = [
     {
-        "email": "sarah.founder@startup.com",
-        "password": "SecurePass123!",
-        "name": "Sarah Chen",
+        "email": "testfounderr@cofounderbay.com",
+        "password": "Test1234!",
+        "name": "Test Founder",
         "role": "founder"
     },
     {
