@@ -2050,6 +2050,27 @@ async def send_intro_request(request_data: IntroRequestCreate, user: dict = Depe
     doc.pop("_id", None)
     return doc
 
+@api_router.get("/connections")
+async def get_connections(user: dict = Depends(get_current_user)):
+    """Get user's connections"""
+    # Get accepted intro requests
+    requests = await db.intro_requests.find({
+        "$or": [
+            {"from_user_id": user["user_id"]},
+            {"to_user_id": user["user_id"]}
+        ],
+        "status": "accepted"
+    }, {"_id": 0}).sort("created_at", -1).to_list(100)
+    
+    connections = []
+    for req in requests:
+        other_id = req["to_user_id"] if req["from_user_id"] == user["user_id"] else req["from_user_id"]
+        other_user = await db.users.find_one({"user_id": other_id}, {"_id": 0, "password_hash": 0})
+        if other_user:
+            connections.append(other_user)
+    
+    return connections
+
 @api_router.get("/intro-requests")
 async def get_intro_requests(user: dict = Depends(get_current_user)):
     """Get intro requests"""
