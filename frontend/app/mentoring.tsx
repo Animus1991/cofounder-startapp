@@ -64,9 +64,6 @@ export default function MentoringScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };;
-      setRefreshing(false);
-    }
   };
 
   const fetchSessions = async () => {
