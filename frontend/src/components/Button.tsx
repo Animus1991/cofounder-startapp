@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
+import { Pressable, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle, Platform } from 'react-native';
 
 interface ButtonProps {
   title: string;
@@ -63,18 +63,29 @@ export const Button: React.FC<ButtonProps> = ({
   const variantStyles = getVariantStyles();
   const sizeStyles = getSizeStyles();
 
+  const handlePress = () => {
+    if (!disabled && !loading) {
+      onPress();
+    }
+  };
+
   return (
-    <TouchableOpacity
-      style={[
+    <Pressable
+      style={({ pressed }) => [
         styles.container,
         variantStyles.container,
         sizeStyles.container,
-        disabled && styles.disabled,
+        (disabled || loading) && styles.disabled,
+        pressed && styles.pressed,
         style,
       ]}
-      onPress={onPress}
+      onPress={handlePress}
       disabled={disabled || loading}
-      activeOpacity={0.8}
+      // Web-specific accessibility
+      {...(Platform.OS === 'web' ? {
+        role: 'button',
+        'aria-disabled': disabled || loading,
+      } : {})}
     >
       {loading ? (
         <ActivityIndicator color={variant === 'outline' || variant === 'ghost' ? '#6366F1' : '#FFFFFF'} />
@@ -86,7 +97,7 @@ export const Button: React.FC<ButtonProps> = ({
           </Text>
         </>
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 };
 
@@ -96,9 +107,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
+    cursor: 'pointer' as any,
   },
   text: {
     fontWeight: '600',
+  },
+  pressed: {
+    opacity: 0.8,
   },
   // Variants
   primaryContainer: {
@@ -152,5 +167,6 @@ const styles = StyleSheet.create({
   // States
   disabled: {
     opacity: 0.5,
+    cursor: 'not-allowed' as any,
   },
 });
