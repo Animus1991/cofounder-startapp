@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,11 +7,12 @@ import { useAuthStore } from '../../src/store/authStore';
 import { Conversation } from '../../src/types';
 import { Avatar } from '../../src/components/Avatar';
 import { LoadingScreen } from '../../src/components/LoadingScreen';
-import { formatRelativeTime, truncateText } from '../../src/utils/helpers';
+import { formatRelativeTime } from '../../src/utils/helpers';
 import api from '../../src/utils/api';
 
 export default function MessagesScreen() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -32,40 +33,47 @@ export default function MessagesScreen() {
     fetchConversations();
   }, []);
 
-  const onRefresh = () => {
+  const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchConversations();
+  }, []);
+
+  const getOtherParticipant = (conversation: Conversation) => {
+    const otherInfo = conversation.participants_info?.find(
+      p => p.user_id !== user?.user_id
+    );
+    return otherInfo || { name: 'Unknown', profile: { profile_image: null } };
   };
 
-  const renderConversation = ({ item }: { item: Conversation }) => (
-    <TouchableOpacity
-      style={styles.conversationCard}
-      onPress={() => router.push(`/chat/${item.user_id}`)}
-    >
-      <View style={styles.avatarContainer}>
-        <Avatar uri={item.user_image} name={item.user_name} size={56} />
+  const renderConversation = ({ item }: { item: Conversation }) => {
+    const other = getOtherParticipant(item);
+    const profileImage = other.profile?.profile_image;
+    
+    return (
+      <TouchableOpacity 
+        style={styles.conversationCard}
+        onPress={() => router.push(`/chat/${item.conversation_id}`)}
+      >
+        <Avatar uri={profileImage} name={other.name || 'User'} size={56} />
+        <View style={styles.conversationInfo}>
+          <View style={styles.conversationHeader}>
+            <Text style={styles.participantName}>{other.name}</Text>
+            <Text style={styles.time}>
+              {item.last_message_at ? formatRelativeTime(item.last_message_at) : ''}
+            </Text>
+          </View>
+          <Text style={styles.lastMessage} numberOfLines={1}>
+            {item.last_message?.content || 'No messages yet'}
+          </Text>
+        </View>
         {item.unread_count > 0 && (
           <View style={styles.unreadBadge}>
             <Text style={styles.unreadCount}>{item.unread_count}</Text>
           </View>
         )}
-      </View>
-      <View style={styles.conversationInfo}>
-        <View style={styles.conversationHeader}>
-          <Text style={[styles.userName, item.unread_count > 0 && styles.userNameUnread]}>
-            {item.user_name}
-          </Text>
-          <Text style={styles.timestamp}>{formatRelativeTime(item.last_message_at)}</Text>
-        </View>
-        <Text 
-          style={[styles.lastMessage, item.unread_count > 0 && styles.lastMessageUnread]}
-          numberOfLines={2}
-        >
-          {truncateText(item.last_message, 80)}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return <LoadingScreen message="Loading messages..." />;
@@ -73,21 +81,13 @@ export default function MessagesScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Messages</Text>
-        <TouchableOpacity style={styles.composeButton}>
+        <TouchableOpacity style={styles.newChatButton}>
           <Ionicons name="create-outline" size={24} color="#6366F1" />
         </TouchableOpacity>
       </View>
 
-      {/* Search Bar (placeholder) */}
-      <TouchableOpacity style={styles.searchBar}>
-        <Ionicons name="search" size={20} color="#6B7280" />
-        <Text style={styles.searchPlaceholder}>Search messages</Text>
-      </TouchableOpacity>
-
-      {/* Conversations List */}
       <FlatList
         data={conversations}
         keyExtractor={(item) => item.conversation_id}
@@ -103,8 +103,8 @@ export default function MessagesScreen() {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="chatbubbles-outline" size={64} color="#374151" />
-            <Text style={styles.emptyTitle}>No messages yet</Text>
-            <Text style={styles.emptyText}>Connect with people to start messaging</Text>
+            <Text style={styles.emptyTitle}>No conversations yet</Text>
+            <Text style={styles.emptyText}>Start connecting with people to begin chatting</Text>
           </View>
         }
       />
@@ -131,53 +131,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#F9FAFB',
   },
-  composeButton: {
+  newChatButton: {
     padding: 8,
   },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1F2937',
-    marginHorizontal: 16,
-    marginVertical: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  searchPlaceholder: {
-    color: '#6B7280',
-    fontSize: 15,
-    marginLeft: 8,
-  },
   listContent: {
-    paddingHorizontal: 16,
+    padding: 16,
   },
   conversationCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1F2937',
-  },
-  avatarContainer: {
-    position: 'relative',
-  },
-  unreadBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: '#6366F1',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
-  },
-  unreadCount: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '600',
+    backgroundColor: '#1F2937',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 8,
   },
   conversationInfo: {
     flex: 1,
@@ -189,30 +155,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
-  userName: {
+  participantName: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#F9FAFB',
   },
-  userNameUnread: {
-    fontWeight: '700',
-  },
-  timestamp: {
+  time: {
     fontSize: 12,
     color: '#6B7280',
   },
   lastMessage: {
     fontSize: 14,
     color: '#9CA3AF',
-    lineHeight: 20,
   },
-  lastMessageUnread: {
-    color: '#E5E7EB',
-    fontWeight: '500',
+  unreadBadge: {
+    backgroundColor: '#6366F1',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  unreadCount: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 80,
+    paddingVertical: 60,
   },
   emptyTitle: {
     fontSize: 20,
@@ -224,5 +196,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#9CA3AF',
     marginTop: 8,
+    textAlign: 'center',
+    paddingHorizontal: 32,
   },
 });
