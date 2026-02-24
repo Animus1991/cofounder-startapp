@@ -1838,11 +1838,14 @@ async def create_group(group: GroupCreate, user: dict = Depends(get_current_user
 async def list_groups(
     search: Optional[str] = None,
     tags: Optional[str] = None,
+    category: Optional[str] = None,
     skip: int = 0,
-    limit: int = 20
+    limit: int = 20,
+    user: dict = Depends(get_current_user)
 ):
     """List groups"""
-    query = {"is_private": False}
+    query = {}
+    # Only show public groups or groups user is a member of
     if search:
         query["$or"] = [
             {"name": {"$regex": search, "$options": "i"}},
@@ -1851,8 +1854,15 @@ async def list_groups(
     if tags:
         tag_list = [t.strip() for t in tags.split(",")]
         query["tags"] = {"$in": tag_list}
+    if category:
+        query["category"] = category
     
     groups = await db.groups.find(query, {"_id": 0}).skip(skip).limit(limit).to_list(limit)
+    
+    # Add membership info
+    for group in groups:
+        group["is_member"] = user["user_id"] in group.get("members", [])
+    
     return groups
 
 @api_router.post("/groups/{group_id}/join")
