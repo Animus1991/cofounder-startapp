@@ -26,7 +26,7 @@ export default function DiscoverScreen() {
 
   const fetchRecommendations = async () => {
     try {
-      const response = await api.get<AIRecommendation[]>('/ai/recommendations');
+      const response = await api.get<AIRecommendation[]>('/recommendations');
       setRecommendations(response.data);
     } catch (error) {
       console.error('Error fetching recommendations:', error);
