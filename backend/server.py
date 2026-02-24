@@ -2785,6 +2785,199 @@ async def get_audit_logs(
     logs = await db.audit_logs.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     return logs
 
+# ============== MENTORING MODULE ==============
+
+@api_router.get("/mentors")
+async def get_mentors(
+    expertise: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 20,
+    user: dict = Depends(get_current_user)
+):
+    """Get list of mentors"""
+    query = {"roles": "mentor"}
+    if expertise:
+        query["profile.skills"] = {"$in": [expertise]}
+    
+    mentors = await db.users.find(query, {"_id": 0, "password_hash": 0}).skip(skip).limit(limit).to_list(limit)
+    
+    # Add mentor info if not exists
+    for mentor in mentors:
+        if not mentor.get("mentor_info"):
+            mentor["mentor_info"] = {
+                "expertise": mentor.get("profile", {}).get("skills", [])[:5],
+                "hourly_rate": 100,
+                "availability": "Weekdays",
+                "total_sessions": 0,
+                "avg_rating": 0
+            }
+    
+    return mentors
+
+@api_router.post("/mentor-sessions")
+async def create_mentor_session(
+    data: dict,
+    user: dict = Depends(get_current_user)
+):
+    """Book a mentor session"""
+    session_id = f"session_{uuid4().hex[:12]}"
+    session = {
+        "session_id": session_id,
+        "mentor_id": data["mentor_id"],
+        "mentee_id": user["user_id"],
+        "topic": data.get("topic", ""),
+        "scheduled_at": data.get("scheduled_at", datetime.now(timezone.utc).isoformat()),
+        "duration_minutes": data.get("duration_minutes", 60),
+        "status": "pending",
+        "notes": data.get("notes", ""),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.mentor_sessions.insert_one(session)
+    session.pop("_id", None)
+    return session
+
+@api_router.get("/mentor-sessions")
+async def get_mentor_sessions(
+    status: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """Get user's mentor sessions"""
+    query = {
+        "$or": [
+            {"mentor_id": user["user_id"]},
+            {"mentee_id": user["user_id"]}
+        ]
+    }
+    if status:
+        query["status"] = status
+    
+    sessions = await db.mentor_sessions.find(query, {"_id": 0}).sort("scheduled_at", -1).to_list(50)
+    
+    # Populate mentor info
+    for session in sessions:
+        mentor = await db.users.find_one({"user_id": session["mentor_id"]}, {"_id": 0, "password_hash": 0})
+        session["mentor"] = mentor
+    
+    return sessions
+
+# ============== LEARNING MODULE ==============
+
+@api_router.get("/courses")
+async def get_courses(
+    category: Optional[str] = None,
+    difficulty: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 20,
+    user: dict = Depends(get_current_user)
+):
+    """Get courses"""
+    query = {}
+    if category:
+        query["category"] = category
+    if difficulty:
+        query["difficulty"] = difficulty
+    
+    courses = await db.courses.find(query, {"_id": 0}).skip(skip).limit(limit).to_list(limit)
+    return courses
+
+@api_router.post("/courses/{course_id}/enroll")
+async def enroll_in_course(course_id: str, user: dict = Depends(get_current_user)):
+    """Enroll in a course"""
+    enrollment = {
+        "enrollment_id": f"enroll_{uuid4().hex[:12]}",
+        "course_id": course_id,
+        "user_id": user["user_id"],
+        "progress": 0,
+        "completed_lessons": [],
+        "enrolled_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.enrollments.insert_one(enrollment)
+    enrollment.pop("_id", None)
+    return enrollment
+
+# ============== GROUPS MODULE ==============
+
+@api_router.get("/groups")
+async def get_groups(
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 20,
+    user: dict = Depends(get_current_user)
+):
+    """Get groups"""
+    query = {}
+    if category:
+        query["category"] = category
+    if search:
+        query["$or"] = [
+            {"name": {"$regex": search, "$options": "i"}},
+            {"description": {"$regex": search, "$options": "i"}}
+        ]
+    
+    groups = await db.groups.find(query, {"_id": 0}).skip(skip).limit(limit).to_list(limit)
+    
+    # Check membership for each group
+    for group in groups:
+        group["is_member"] = user["user_id"] in group.get("members", [])
+    
+    return groups
+
+@api_router.post("/groups")
+async def create_group(data: dict, user: dict = Depends(get_current_user)):
+    """Create a new group"""
+    group_id = f"group_{uuid4().hex[:12]}"
+    group = {
+        "group_id": group_id,
+        "name": data["name"],
+        "description": data["description"],
+        "category": data.get("category", "Founders"),
+        "privacy": data.get("privacy", "public"),
+        "cover_image": data.get("cover_image"),
+        "tags": data.get("tags", []),
+        "members": [user["user_id"]],
+        "admins": [user["user_id"]],
+        "member_count": 1,
+        "post_count": 0,
+        "created_by": user["user_id"],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.groups.insert_one(group)
+    group.pop("_id", None)
+    group["is_member"] = True
+    return group
+
+@api_router.post("/groups/{group_id}/join")
+async def join_group(group_id: str, user: dict = Depends(get_current_user)):
+    """Join a group"""
+    group = await db.groups.find_one({"group_id": group_id})
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    
+    if user["user_id"] in group.get("members", []):
+        raise HTTPException(status_code=400, detail="Already a member")
+    
+    await db.groups.update_one(
+        {"group_id": group_id},
+        {
+            "$push": {"members": user["user_id"]},
+            "$inc": {"member_count": 1}
+        }
+    )
+    return {"message": "Joined group successfully"}
+
+@api_router.post("/groups/{group_id}/leave")
+async def leave_group(group_id: str, user: dict = Depends(get_current_user)):
+    """Leave a group"""
+    await db.groups.update_one(
+        {"group_id": group_id},
+        {
+            "$pull": {"members": user["user_id"]},
+            "$inc": {"member_count": -1}
+        }
+    )
+    return {"message": "Left group successfully"}
+
 # ============== HEALTH CHECK ==============
 
 @api_router.get("/")
