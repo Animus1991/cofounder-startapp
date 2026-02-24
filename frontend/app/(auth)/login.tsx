@@ -25,8 +25,13 @@ export default function LoginScreen() {
     setLoading(true);
     setError('');
     try {
+      console.log('Attempting login for:', email);
       await login(email, password);
+      console.log('Login successful, redirecting...');
+      // Force navigation after successful login
+      router.replace('/(tabs)/feed');
     } catch (err: any) {
+      console.error('Login error:', err);
       setError(err.response?.data?.detail || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
