@@ -1,24 +1,26 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Platform, KeyboardAvoidingView, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, KeyboardAvoidingView, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../../src/store/authStore';
 import { Input } from '../../src/components/Input';
 import { Button } from '../../src/components/Button';
-import { Avatar } from '../../src/components/Avatar';
 
 const skillSuggestions = [
-  'Product Management', 'Software Engineering', 'Marketing', 'Sales', 'Finance',
-  'Design', 'Operations', 'Data Science', 'AI/ML', 'Blockchain',
-  'Growth Hacking', 'Business Development', 'Legal', 'HR', 'Strategy'
+  'Product Management', 'Software Engineering', 'UI/UX Design', 'Marketing', 'Sales',
+  'Business Development', 'Finance', 'Data Science', 'Machine Learning', 'Growth Hacking',
+  'Full Stack', 'Frontend', 'Backend', 'Mobile Development', 'DevOps', 'AI/ML'
+];
+
+const sectorSuggestions = [
+  'FinTech', 'HealthTech', 'EdTech', 'SaaS', 'E-commerce', 'AI/ML',
+  'CleanTech', 'FoodTech', 'PropTech', 'InsurTech', 'AgriTech', 'Crypto/Web3'
 ];
 
 const interestSuggestions = [
-  'SaaS', 'FinTech', 'HealthTech', 'EdTech', 'E-commerce',
-  'AI/ML', 'Web3', 'CleanTech', 'FoodTech', 'PropTech',
-  'Social Impact', 'Gaming', 'B2B', 'B2C', 'Marketplace'
+  'Startups', 'Investing', 'Networking', 'Mentoring', 'Co-founding',
+  'Fundraising', 'Product Building', 'Scaling', 'Exit Strategy', 'Remote Work'
 ];
 
 export default function OnboardingScreen() {
@@ -27,49 +29,31 @@ export default function OnboardingScreen() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   
-  // Step 1: Basic Info
-  const [headline, setHeadline] = useState('');
-  const [bio, setBio] = useState('');
-  const [location, setLocation] = useState('');
-  const [profileImage, setProfileImage] = useState<string | null>(user?.profile_image || null);
-  
-  // Step 2: Skills & Interests
-  const [skills, setSkills] = useState<string[]>([]);
-  const [interests, setInterests] = useState<string[]>([]);
-  
-  // Step 3: Role-specific
-  const [companyName, setCompanyName] = useState('');
-  const [lookingFor, setLookingFor] = useState('');
+  // Profile data
+  const [headline, setHeadline] = useState(user?.profile?.headline || '');
+  const [bio, setBio] = useState(user?.profile?.bio || '');
+  const [location, setLocation] = useState(user?.profile?.location || '');
+  const [linkedinUrl, setLinkedinUrl] = useState(user?.profile?.linkedin_url || '');
+  const [skills, setSkills] = useState<string[]>(user?.profile?.skills || []);
+  const [sectors, setSectors] = useState<string[]>(user?.profile?.sectors || []);
+  const [interests, setInterests] = useState<string[]>(user?.profile?.interests || []);
+  const [lookingFor, setLookingFor] = useState(user?.profile?.looking_for || '');
 
-  const totalSteps = 3;
+  const totalSteps = 4;
 
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-      base64: true,
-    });
-
-    if (!result.canceled && result.assets[0].base64) {
-      setProfileImage(`data:image/jpeg;base64,${result.assets[0].base64}`);
+  const toggleItem = (item: string, list: string[], setList: (list: string[]) => void) => {
+    if (list.includes(item)) {
+      setList(list.filter(i => i !== item));
+    } else {
+      setList([...list, item]);
     }
   };
 
-  const toggleSkill = (skill: string) => {
-    if (skills.includes(skill)) {
-      setSkills(skills.filter(s => s !== skill));
-    } else if (skills.length < 10) {
-      setSkills([...skills, skill]);
-    }
-  };
-
-  const toggleInterest = (interest: string) => {
-    if (interests.includes(interest)) {
-      setInterests(interests.filter(i => i !== interest));
-    } else if (interests.length < 10) {
-      setInterests([...interests, interest]);
+  const handleNext = () => {
+    if (step < totalSteps) {
+      setStep(step + 1);
+    } else {
+      handleComplete();
     }
   };
 
@@ -80,15 +64,15 @@ export default function OnboardingScreen() {
         headline,
         bio,
         location,
-        profile_image: profileImage || undefined,
+        linkedin_url: linkedinUrl,
         skills,
+        sectors,
         interests,
-        company_name: companyName || undefined,
-        looking_for: lookingFor || undefined,
+        looking_for: lookingFor,
       });
       router.replace('/(tabs)/feed');
     } catch (error) {
-      console.error('Profile update error:', error);
+      console.error('Error updating profile:', error);
     } finally {
       setLoading(false);
     }
@@ -98,194 +82,186 @@ export default function OnboardingScreen() {
     router.replace('/(tabs)/feed');
   };
 
-  const renderStep1 = () => (
-    <>
-      <Text style={styles.stepTitle}>Tell us about yourself</Text>
-      <Text style={styles.stepSubtitle}>Help others get to know you better</Text>
+  const renderStep = () => {
+    switch (step) {
+      case 1:
+        return (
+          <>
+            <Text style={styles.stepTitle}>Tell us about yourself</Text>
+            <Text style={styles.stepSubtitle}>Help others understand who you are</Text>
+            
+            <Input
+              label="Professional Headline"
+              placeholder="e.g., Serial Entrepreneur | Ex-Google | AI Enthusiast"
+              value={headline}
+              onChangeText={setHeadline}
+              leftIcon="briefcase-outline"
+            />
+            
+            <View style={styles.textAreaContainer}>
+              <Text style={styles.label}>Bio</Text>
+              <TextInput
+                style={styles.textArea}
+                placeholder="Tell your story in a few sentences..."
+                placeholderTextColor="#6B7280"
+                value={bio}
+                onChangeText={setBio}
+                multiline
+                numberOfLines={4}
+              />
+            </View>
 
-      {/* Profile Image */}
-      <TouchableOpacity style={styles.imagePickerContainer} onPress={pickImage}>
-        {profileImage ? (
-          <Image 
-            source={{ uri: profileImage }} 
-            style={styles.profileImage} 
-          />
-        ) : (
-          <View style={styles.imagePlaceholder}>
-            <Ionicons name="camera" size={32} color="#6B7280" />
-          </View>
-        )}
-        <View style={styles.editBadge}>
-          <Ionicons name="pencil" size={14} color="#FFFFFF" />
-        </View>
-      </TouchableOpacity>
+            <Input
+              label="Location"
+              placeholder="e.g., San Francisco, CA"
+              value={location}
+              onChangeText={setLocation}
+              leftIcon="location-outline"
+            />
 
-      <Input
-        label="Headline"
-        placeholder="e.g., Founder at TechStartup | Ex-Google"
-        value={headline}
-        onChangeText={setHeadline}
-        maxLength={100}
-      />
+            <Input
+              label="LinkedIn URL"
+              placeholder="https://linkedin.com/in/yourprofile"
+              value={linkedinUrl}
+              onChangeText={setLinkedinUrl}
+              leftIcon="logo-linkedin"
+              autoCapitalize="none"
+            />
+          </>
+        );
+      
+      case 2:
+        return (
+          <>
+            <Text style={styles.stepTitle}>Your Skills</Text>
+            <Text style={styles.stepSubtitle}>Select skills that define your expertise</Text>
+            
+            <View style={styles.tagsContainer}>
+              {skillSuggestions.map((skill) => (
+                <TouchableOpacity
+                  key={skill}
+                  style={[styles.tag, skills.includes(skill) && styles.tagSelected]}
+                  onPress={() => toggleItem(skill, skills, setSkills)}
+                >
+                  <Text style={[styles.tagText, skills.includes(skill) && styles.tagTextSelected]}>
+                    {skill}
+                  </Text>
+                  {skills.includes(skill) && (
+                    <Ionicons name="checkmark" size={14} color="#FFFFFF" style={styles.tagIcon} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            <Text style={styles.selectedCount}>{skills.length} selected</Text>
+          </>
+        );
+      
+      case 3:
+        return (
+          <>
+            <Text style={styles.stepTitle}>Sectors & Interests</Text>
+            <Text style={styles.stepSubtitle}>What industries excite you?</Text>
+            
+            <Text style={styles.sectionLabel}>Sectors</Text>
+            <View style={styles.tagsContainer}>
+              {sectorSuggestions.map((sector) => (
+                <TouchableOpacity
+                  key={sector}
+                  style={[styles.tag, sectors.includes(sector) && styles.tagSelectedGreen]}
+                  onPress={() => toggleItem(sector, sectors, setSectors)}
+                >
+                  <Text style={[styles.tagText, sectors.includes(sector) && styles.tagTextSelected]}>
+                    {sector}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            <Text style={[styles.sectionLabel, { marginTop: 24 }]}>Interests</Text>
+            <View style={styles.tagsContainer}>
+              {interestSuggestions.map((interest) => (
+                <TouchableOpacity
+                  key={interest}
+                  style={[styles.tag, interests.includes(interest) && styles.tagSelectedOrange]}
+                  onPress={() => toggleItem(interest, interests, setInterests)}
+                >
+                  <Text style={[styles.tagText, interests.includes(interest) && styles.tagTextSelected]}>
+                    {interest}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        );
+      
+      case 4:
+        return (
+          <>
+            <Text style={styles.stepTitle}>What are you looking for?</Text>
+            <Text style={styles.stepSubtitle}>Help others know how to collaborate with you</Text>
+            
+            <View style={styles.textAreaContainer}>
+              <Text style={styles.label}>Looking For</Text>
+              <TextInput
+                style={[styles.textArea, { minHeight: 120 }]}
+                placeholder="e.g., Looking for a technical co-founder for my AI startup, or mentorship in fundraising..."
+                placeholderTextColor="#6B7280"
+                value={lookingFor}
+                onChangeText={setLookingFor}
+                multiline
+                numberOfLines={5}
+              />
+            </View>
 
-      <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>Bio</Text>
-        <TextInput
-          style={styles.bioInput}
-          placeholder="Tell us your story..."
-          placeholderTextColor="#6B7280"
-          value={bio}
-          onChangeText={setBio}
-          multiline
-          numberOfLines={4}
-          maxLength={500}
-        />
-        <Text style={styles.charCount}>{bio.length}/500</Text>
-      </View>
-
-      <Input
-        label="Location"
-        placeholder="e.g., San Francisco, CA"
-        value={location}
-        onChangeText={setLocation}
-        leftIcon="location-outline"
-      />
-    </>
-  );
-
-  const renderStep2 = () => (
-    <>
-      <Text style={styles.stepTitle}>Your Skills & Interests</Text>
-      <Text style={styles.stepSubtitle}>Select up to 10 of each</Text>
-
-      <Text style={styles.sectionLabel}>Skills ({skills.length}/10)</Text>
-      <View style={styles.tagsContainer}>
-        {skillSuggestions.map((skill) => (
-          <TouchableOpacity
-            key={skill}
-            style={[
-              styles.tagChip,
-              skills.includes(skill) && styles.tagChipSelected
-            ]}
-            onPress={() => toggleSkill(skill)}
-          >
-            <Text style={[
-              styles.tagText,
-              skills.includes(skill) && styles.tagTextSelected
-            ]}>{skill}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={styles.sectionLabel}>Interests ({interests.length}/10)</Text>
-      <View style={styles.tagsContainer}>
-        {interestSuggestions.map((interest) => (
-          <TouchableOpacity
-            key={interest}
-            style={[
-              styles.tagChip,
-              interests.includes(interest) && styles.tagChipSelected
-            ]}
-            onPress={() => toggleInterest(interest)}
-          >
-            <Text style={[
-              styles.tagText,
-              interests.includes(interest) && styles.tagTextSelected
-            ]}>{interest}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </>
-  );
-
-  const renderStep3 = () => (
-    <>
-      <Text style={styles.stepTitle}>Almost there!</Text>
-      <Text style={styles.stepSubtitle}>A few more details to complete your profile</Text>
-
-      {user?.role === 'founder' && (
-        <Input
-          label="Company/Startup Name"
-          placeholder="Your company or project name"
-          value={companyName}
-          onChangeText={setCompanyName}
-          leftIcon="business-outline"
-        />
-      )}
-
-      <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>What are you looking for?</Text>
-        <TextInput
-          style={styles.bioInput}
-          placeholder={
-            user?.role === 'founder' 
-              ? "e.g., Technical co-founder, seed funding, mentorship..." 
-              : user?.role === 'investor'
-              ? "e.g., Early-stage startups, SaaS, FinTech..."
-              : "e.g., Advisory roles, startup opportunities..."
-          }
-          placeholderTextColor="#6B7280"
-          value={lookingFor}
-          onChangeText={setLookingFor}
-          multiline
-          numberOfLines={3}
-          maxLength={300}
-        />
-      </View>
-    </>
-  );
+            <View style={styles.summaryCard}>
+              <Ionicons name="sparkles" size={24} color="#F59E0B" />
+              <View style={styles.summaryContent}>
+                <Text style={styles.summaryTitle}>Your Profile Summary</Text>
+                <Text style={styles.summaryText}>
+                  {skills.length} skills • {sectors.length} sectors • {interests.length} interests
+                </Text>
+              </View>
+            </View>
+          </>
+        );
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+          <TouchableOpacity style={styles.backButton} onPress={() => step > 1 ? setStep(step - 1) : router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#F9FAFB" />
+          </TouchableOpacity>
+          <View style={styles.progressBar}>
+            <View style={[styles.progressFill, { width: `${(step / totalSteps) * 100}%` }]} />
+          </View>
+          <TouchableOpacity onPress={handleSkip}>
             <Text style={styles.skipText}>Skip</Text>
           </TouchableOpacity>
-          <View style={styles.progressContainer}>
-            {Array.from({ length: totalSteps }).map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.progressBar,
-                  index < step && styles.progressBarActive,
-                  index === 0 && styles.progressBarFirst,
-                  index === totalSteps - 1 && styles.progressBarLast,
-                ]}
-              />
-            ))}
-          </View>
         </View>
 
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {step === 1 && renderStep1()}
-          {step === 2 && renderStep2()}
-          {step === 3 && renderStep3()}
+          {renderStep()}
         </ScrollView>
 
         {/* Footer */}
         <View style={styles.footer}>
-          {step > 1 && (
-            <Button
-              title="Back"
-              onPress={() => setStep(step - 1)}
-              variant="outline"
-              style={styles.backButton}
-            />
-          )}
           <Button
-            title={step === totalSteps ? 'Complete' : 'Continue'}
-            onPress={step === totalSteps ? handleComplete : () => setStep(step + 1)}
+            title={step === totalSteps ? 'Complete Setup' : 'Continue'}
+            onPress={handleNext}
             loading={loading}
-            style={styles.nextButton}
+            size="large"
           />
         </View>
       </KeyboardAvoidingView>
@@ -302,44 +278,33 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  skipButton: {
-    alignSelf: 'flex-end',
-    padding: 8,
-  },
-  skipText: {
-    color: '#6B7280',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  progressContainer: {
     flexDirection: 'row',
-    marginTop: 16,
-    gap: 4,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  backButton: {
+    padding: 8,
   },
   progressBar: {
     flex: 1,
     height: 4,
     backgroundColor: '#374151',
+    borderRadius: 2,
+    marginHorizontal: 16,
   },
-  progressBarActive: {
+  progressFill: {
+    height: '100%',
     backgroundColor: '#6366F1',
+    borderRadius: 2,
   },
-  progressBarFirst: {
-    borderTopLeftRadius: 2,
-    borderBottomLeftRadius: 2,
-  },
-  progressBarLast: {
-    borderTopRightRadius: 2,
-    borderBottomRightRadius: 2,
+  skipText: {
+    color: '#9CA3AF',
+    fontSize: 15,
+    fontWeight: '500',
   },
   scrollContent: {
-    flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 24,
     paddingBottom: 24,
   },
   stepTitle: {
@@ -353,108 +318,101 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginBottom: 32,
   },
-  imagePickerContainer: {
-    alignSelf: 'center',
-    marginBottom: 24,
-  },
-  profileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-  },
-  imagePlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#1F2937',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#374151',
-    borderStyle: 'dashed',
-  },
-  editBadge: {
-    position: 'absolute',
-    bottom: 4,
-    right: 4,
-    backgroundColor: '#6366F1',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  inputLabel: {
+  label: {
     fontSize: 14,
     fontWeight: '500',
     color: '#E5E7EB',
     marginBottom: 8,
   },
-  bioInput: {
+  textAreaContainer: {
+    marginBottom: 16,
+  },
+  textArea: {
     backgroundColor: '#1F2937',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#374151',
+    padding: 16,
     color: '#F9FAFB',
     fontSize: 16,
-    padding: 16,
     minHeight: 100,
     textAlignVertical: 'top',
-  },
-  charCount: {
-    fontSize: 12,
-    color: '#6B7280',
-    textAlign: 'right',
-    marginTop: 4,
   },
   sectionLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#E5E7EB',
+    color: '#F9FAFB',
     marginBottom: 12,
-    marginTop: 8,
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 24,
+    gap: 10,
   },
-  tagChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#1F2937',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#374151',
   },
-  tagChipSelected: {
+  tagSelected: {
     backgroundColor: '#6366F1',
     borderColor: '#6366F1',
   },
+  tagSelectedGreen: {
+    backgroundColor: '#10B981',
+    borderColor: '#10B981',
+  },
+  tagSelectedOrange: {
+    backgroundColor: '#F59E0B',
+    borderColor: '#F59E0B',
+  },
   tagText: {
-    fontSize: 14,
     color: '#9CA3AF',
+    fontSize: 14,
+    fontWeight: '500',
   },
   tagTextSelected: {
     color: '#FFFFFF',
-    fontWeight: '500',
+  },
+  tagIcon: {
+    marginLeft: 6,
+  },
+  selectedCount: {
+    color: '#6B7280',
+    fontSize: 14,
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  summaryCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F59E0B15',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 24,
+  },
+  summaryContent: {
+    marginLeft: 12,
+  },
+  summaryTitle: {
+    color: '#F59E0B',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  summaryText: {
+    color: '#9CA3AF',
+    fontSize: 14,
+    marginTop: 4,
   },
   footer: {
-    flexDirection: 'row',
     paddingHorizontal: 24,
     paddingVertical: 16,
-    gap: 12,
     borderTopWidth: 1,
     borderTopColor: '#1F2937',
-  },
-  backButton: {
-    flex: 1,
-  },
-  nextButton: {
-    flex: 2,
   },
 });

@@ -8,7 +8,7 @@ import { Input } from '../../src/components/Input';
 import { Button } from '../../src/components/Button';
 import { UserRole, roleLabels, roleColors, roleIcons } from '../../src/types';
 
-const roles: UserRole[] = ['founder', 'investor', 'mentor', 'service_provider', 'talent'];
+const roles: UserRole[] = ['founder', 'investor', 'mentor', 'service_provider', 'talent', 'startup_team'];
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -84,8 +84,8 @@ export default function RegisterScreen() {
 
           {step === 1 ? (
             <>
-              <Text style={styles.title}>Create Account</Text>
-              <Text style={styles.subtitle}>Join the startup ecosystem</Text>
+              <Text style={styles.title}>Join CoFounderBay</Text>
+              <Text style={styles.subtitle}>Create your account to connect with the startup ecosystem</Text>
 
               {error ? (
                 <View style={styles.errorContainer}>

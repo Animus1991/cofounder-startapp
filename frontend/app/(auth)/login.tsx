@@ -28,7 +28,6 @@ export default function LoginScreen() {
       console.log('Attempting login for:', email);
       await login(email, password);
       console.log('Login successful, redirecting...');
-      // Force navigation after successful login
       router.replace('/(tabs)/feed');
     } catch (err: any) {
       console.error('Login error:', err);
@@ -39,7 +38,6 @@ export default function LoginScreen() {
   };
 
   const handleGoogleLogin = () => {
-    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
     const currentUrl = Platform.select({
       web: typeof window !== 'undefined' ? window.location.origin : '',
       default: Linking.createURL(''),
@@ -69,7 +67,7 @@ export default function LoginScreen() {
             <View style={styles.logoContainer}>
               <Ionicons name="rocket" size={48} color="#6366F1" />
             </View>
-            <Text style={styles.appName}>CoFounder Connect</Text>
+            <Text style={styles.appName}>CoFounderBay</Text>
             <Text style={styles.tagline}>Connect with the startup ecosystem</Text>
           </View>
 
