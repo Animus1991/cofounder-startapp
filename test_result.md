@@ -356,11 +356,13 @@ metadata:
 
 test_plan:
   current_focus:
+    - "Authentication Backend Integration Fix"
     - "Login and Registration Flow"
-    - "Social Feed functionality"
-  stuck_tasks: []
+  stuck_tasks: 
+    - "Login Screen (Email/Password + Google OAuth)"
+    - "Registration Screen with Role Selection"
   test_all: false
-  test_priority: "high_first"
+  test_priority: "stuck_first"
 
 agent_communication:
   - agent: "main"
@@ -369,3 +371,5 @@ agent_communication:
     message: "Backend API comprehensive testing completed. All 13 requested API flows tested and working: registration, login, profile management, posts CRUD, likes/comments, discovery, connections, messaging, and conversations. AI recommendations and Google OAuth endpoints validated. Only minor issue found was in connection request test due to test data handling, but actual API functionality is working correctly. Backend APIs are production-ready with 95.7% success rate."
   - agent: "testing"
     message: "CoFounderBay v2.0 backend testing completed successfully! All high-priority backend APIs tested with specific test sequence: ✅ Authentication (register/login), ✅ Posts CRUD (create/read/react/comment), ✅ User Discovery with role filters, ✅ Opportunities (get/create), ✅ Connections, ✅ Conversations, ✅ Profile management. 100% success rate achieved. All requested API endpoints working correctly with proper authentication and data handling."
+  - agent: "testing"
+    message: "CRITICAL FRONTEND ISSUE FOUND: Mobile UI testing reveals authentication is completely broken. ROOT CAUSE: Backend error 'passlib.exc.UnknownHashError: hash could not be identified' indicates password hash corruption in database. Frontend UI renders perfectly with mobile-responsive design and proper CoFounderBay branding, but authentication fails silently. Registration form has input field selector issues. ALL POST-AUTH features untestable until authentication is fixed. IMMEDIATE ACTION REQUIRED: Fix password hashing in backend database."
