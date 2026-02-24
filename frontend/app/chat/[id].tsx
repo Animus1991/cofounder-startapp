@@ -1,118 +1,130 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuthStore } from '../../src/store/authStore';
-import { Message, User } from '../../src/types';
 import { Avatar } from '../../src/components/Avatar';
 import { LoadingScreen } from '../../src/components/LoadingScreen';
 import { formatRelativeTime } from '../../src/utils/helpers';
 import api from '../../src/utils/api';
 
+interface Message {
+  message_id: string;
+  conversation_id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+  read: boolean;
+  sender?: {
+    name: string;
+    profile?: {
+      profile_image?: string;
+    };
+  };
+}
+
+interface Participant {
+  user_id: string;
+  name: string;
+  profile?: {
+    profile_image?: string;
+    headline?: string;
+  };
+}
+
 export default function ChatScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { user: currentUser } = useAuthStore();
-  const [otherUser, setOtherUser] = useState<User | null>(null);
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { user } = useAuthStore();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
-  const [messageText, setMessageText] = useState('');
   const [sending, setSending] = useState(false);
+  const [newMessage, setNewMessage] = useState('');
+  const [otherParticipant, setOtherParticipant] = useState<Participant | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [userResponse, messagesResponse] = await Promise.all([
-          api.get<User>(`/users/${id}`),
-          api.get<Message[]>(`/messages/${id}`),
-        ]);
-        
-        setOtherUser(userResponse.data);
-        setMessages(messagesResponse.data);
-      } catch (error) {
-        console.error('Error fetching chat:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchMessages = async () => {
+    try {
+      const response = await api.get<Message[]>(`/conversations/${id}/messages`);
+      setMessages(response.data.reverse());
+      
+      // Get conversation info
+      const convResponse = await api.get(`/conversations/${id}`);
+      const conv = convResponse.data;
+      const other = conv.participants_info?.find(
+        (p: Participant) => p.user_id !== user?.user_id
+      );
+      setOtherParticipant(other || null);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    if (id) fetchData();
+  useEffect(() => {
+    if (id) {
+      fetchMessages();
+      // Poll for new messages
+      const interval = setInterval(fetchMessages, 5000);
+      return () => clearInterval(interval);
+    }
   }, [id]);
 
-  const sendMessage = async () => {
-    if (!messageText.trim() || sending) return;
+  const handleSend = async () => {
+    if (!newMessage.trim() || sending) return;
 
+    const messageContent = newMessage.trim();
+    setNewMessage('');
     setSending(true);
-    const content = messageText.trim();
-    setMessageText('');
 
     // Optimistic update
     const tempMessage: Message = {
-      message_id: `temp_${Date.now()}`,
-      sender_id: currentUser?.user_id || '',
-      receiver_id: id || '',
-      content,
-      is_read: false,
+      message_id: `temp-${Date.now()}`,
+      conversation_id: id || '',
+      sender_id: user?.user_id || '',
+      content: messageContent,
       created_at: new Date().toISOString(),
+      read: true,
+      sender: {
+        name: user?.name || '',
+        profile: user?.profile
+      }
     };
     setMessages(prev => [...prev, tempMessage]);
 
     try {
-      const response = await api.post<Message>('/messages', {
-        receiver_id: id,
-        content,
+      await api.post(`/conversations/${id}/messages`, {
+        content: messageContent
       });
-      
-      // Replace temp message with real one
-      setMessages(prev => prev.map(m => 
-        m.message_id === tempMessage.message_id ? response.data : m
-      ));
+      fetchMessages();
     } catch (error) {
       console.error('Error sending message:', error);
-      // Remove temp message on error
+      // Remove optimistic message on error
       setMessages(prev => prev.filter(m => m.message_id !== tempMessage.message_id));
-      setMessageText(content); // Restore the message
     } finally {
       setSending(false);
     }
   };
 
-  const renderMessage = ({ item, index }: { item: Message; index: number }) => {
-    const isOwn = item.sender_id === currentUser?.user_id;
-    const showAvatar = !isOwn && (
-      index === 0 || messages[index - 1]?.sender_id !== item.sender_id
-    );
+  const renderMessage = ({ item }: { item: Message }) => {
+    const isMe = item.sender_id === user?.user_id;
 
     return (
-      <View style={[
-        styles.messageRow,
-        isOwn ? styles.messageRowOwn : styles.messageRowOther
-      ]}>
-        {!isOwn && (
-          <View style={styles.avatarContainer}>
-            {showAvatar ? (
-              <Avatar uri={otherUser?.profile_image} name={otherUser?.name || ''} size={32} />
-            ) : (
-              <View style={styles.avatarPlaceholder} />
-            )}
-          </View>
+      <View style={[styles.messageRow, isMe && styles.messageRowMe]}>
+        {!isMe && (
+          <Avatar 
+            uri={otherParticipant?.profile?.profile_image} 
+            name={otherParticipant?.name || ''} 
+            size={32} 
+          />
         )}
-        <View style={[
-          styles.messageBubble,
-          isOwn ? styles.messageBubbleOwn : styles.messageBubbleOther
-        ]}>
-          <Text style={[
-            styles.messageText,
-            isOwn ? styles.messageTextOwn : styles.messageTextOther
-          ]}>
+        <View style={[styles.messageBubble, isMe ? styles.messageBubbleMe : styles.messageBubbleOther]}>
+          <Text style={[styles.messageText, isMe && styles.messageTextMe]}>
             {item.content}
           </Text>
-          <Text style={[
-            styles.messageTime,
-            isOwn ? styles.messageTimeOwn : styles.messageTimeOther
-          ]}>
+          <Text style={[styles.messageTime, isMe && styles.messageTimeMe]}>
             {formatRelativeTime(item.created_at)}
           </Text>
         </View>
@@ -121,28 +133,33 @@ export default function ChatScreen() {
   };
 
   if (loading) {
-    return <LoadingScreen message="Loading chat..." />;
+    return <LoadingScreen message="Loading conversation..." />;
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#F9FAFB" />
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.userInfo}
-          onPress={() => router.push(`/user/${id}`)}
-        >
-          <Avatar uri={otherUser?.profile_image} name={otherUser?.name || ''} size={40} />
+        
+        <TouchableOpacity style={styles.userInfo}>
+          <Avatar 
+            uri={otherParticipant?.profile?.profile_image} 
+            name={otherParticipant?.name || 'User'} 
+            size={40} 
+          />
           <View style={styles.userDetails}>
-            <Text style={styles.userName}>{otherUser?.name}</Text>
-            <Text style={styles.userStatus}>
-              {otherUser?.headline || otherUser?.role}
-            </Text>
+            <Text style={styles.userName}>{otherParticipant?.name || 'User'}</Text>
+            {otherParticipant?.profile?.headline && (
+              <Text style={styles.userHeadline} numberOfLines={1}>
+                {otherParticipant.profile.headline}
+              </Text>
+            )}
           </View>
         </TouchableOpacity>
+
         <TouchableOpacity style={styles.moreButton}>
           <Ionicons name="ellipsis-vertical" size={20} color="#F9FAFB" />
         </TouchableOpacity>
@@ -151,8 +168,8 @@ export default function ChatScreen() {
       {/* Messages */}
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.messagesContainer}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        style={styles.chatContainer}
+        keyboardVerticalOffset={0}
       >
         <FlatList
           ref={flatListRef}
@@ -160,47 +177,38 @@ export default function ChatScreen() {
           keyExtractor={(item) => item.message_id}
           renderItem={renderMessage}
           contentContainerStyle={styles.messagesList}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <View style={styles.emptyIcon}>
-                <Ionicons name="chatbubbles-outline" size={48} color="#6366F1" />
-              </View>
-              <Text style={styles.emptyTitle}>Start the conversation</Text>
-              <Text style={styles.emptyText}>
-                Say hello to {otherUser?.name}
-              </Text>
+              <Ionicons name="chatbubble-outline" size={48} color="#374151" />
+              <Text style={styles.emptyText}>No messages yet</Text>
+              <Text style={styles.emptySubtext}>Say hello to start the conversation!</Text>
             </View>
           }
         />
 
         {/* Input */}
         <View style={styles.inputContainer}>
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={styles.input}
-              placeholder="Type a message..."
-              placeholderTextColor="#6B7280"
-              value={messageText}
-              onChangeText={setMessageText}
-              multiline
-              maxLength={1000}
+          <TextInput
+            style={styles.input}
+            placeholder="Type a message..."
+            placeholderTextColor="#6B7280"
+            value={newMessage}
+            onChangeText={setNewMessage}
+            multiline
+            maxLength={1000}
+          />
+          <TouchableOpacity 
+            style={[styles.sendButton, (!newMessage.trim() || sending) && styles.sendButtonDisabled]}
+            onPress={handleSend}
+            disabled={!newMessage.trim() || sending}
+          >
+            <Ionicons 
+              name="send" 
+              size={20} 
+              color={newMessage.trim() && !sending ? '#FFFFFF' : '#6B7280'} 
             />
-            <TouchableOpacity 
-              style={[
-                styles.sendButton,
-                (!messageText.trim() || sending) && styles.sendButtonDisabled
-              ]} 
-              onPress={sendMessage}
-              disabled={!messageText.trim() || sending}
-            >
-              <Ionicons 
-                name="send" 
-                size={20} 
-                color={messageText.trim() && !sending ? '#FFFFFF' : '#6B7280'} 
-              />
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -222,12 +230,12 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 4,
-    marginRight: 8,
   },
   userInfo: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    marginLeft: 12,
   },
   userDetails: {
     marginLeft: 12,
@@ -238,14 +246,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#F9FAFB',
   },
-  userStatus: {
+  userHeadline: {
     fontSize: 13,
     color: '#9CA3AF',
+    marginTop: 2,
   },
   moreButton: {
     padding: 8,
   },
-  messagesContainer: {
+  chatContainer: {
     flex: 1,
   },
   messagesList: {
@@ -254,55 +263,43 @@ const styles = StyleSheet.create({
   },
   messageRow: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: 12,
+    alignItems: 'flex-end',
   },
-  messageRowOwn: {
+  messageRowMe: {
     justifyContent: 'flex-end',
-  },
-  messageRowOther: {
-    justifyContent: 'flex-start',
-  },
-  avatarContainer: {
-    width: 32,
-    marginRight: 8,
-  },
-  avatarPlaceholder: {
-    width: 32,
-    height: 32,
   },
   messageBubble: {
     maxWidth: '75%',
     padding: 12,
     borderRadius: 16,
-  },
-  messageBubbleOwn: {
-    backgroundColor: '#6366F1',
-    borderBottomRightRadius: 4,
+    marginLeft: 8,
   },
   messageBubbleOther: {
     backgroundColor: '#1F2937',
     borderBottomLeftRadius: 4,
   },
+  messageBubbleMe: {
+    backgroundColor: '#6366F1',
+    borderBottomRightRadius: 4,
+    marginLeft: 0,
+  },
   messageText: {
     fontSize: 15,
+    color: '#E5E7EB',
     lineHeight: 22,
   },
-  messageTextOwn: {
+  messageTextMe: {
     color: '#FFFFFF',
-  },
-  messageTextOther: {
-    color: '#E5E7EB',
   },
   messageTime: {
     fontSize: 11,
-    marginTop: 4,
-  },
-  messageTimeOwn: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'right',
-  },
-  messageTimeOther: {
     color: '#6B7280',
+    marginTop: 4,
+    alignSelf: 'flex-end',
+  },
+  messageTimeMe: {
+    color: 'rgba(255,255,255,0.7)',
   },
   emptyState: {
     flex: 1,
@@ -310,49 +307,39 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 60,
   },
-  emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#6366F120',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 18,
+  emptyText: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#F9FAFB',
-    marginBottom: 4,
+    marginTop: 12,
   },
-  emptyText: {
+  emptySubtext: {
     fontSize: 14,
     color: '#9CA3AF',
+    marginTop: 4,
   },
   inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     padding: 12,
     borderTopWidth: 1,
     borderTopColor: '#1F2937',
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    backgroundColor: '#1F2937',
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    backgroundColor: '#111827',
   },
   input: {
     flex: 1,
+    backgroundColor: '#1F2937',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     color: '#F9FAFB',
     fontSize: 15,
     maxHeight: 100,
-    paddingVertical: 8,
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#6366F1',
     alignItems: 'center',
     justifyContent: 'center',
