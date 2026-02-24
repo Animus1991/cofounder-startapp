@@ -11,8 +11,8 @@ interface AuthState {
   needsOnboarding: boolean;
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string, role: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
+  register: (email: string, password: string, name: string, role: string) => Promise<User>;
   exchangeSession: (sessionId: string) => Promise<AuthResponse>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
@@ -30,52 +30,100 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setToken: (token) => set({ token }),
 
   login: async (email, password) => {
+    console.log('[AuthStore] Attempting login for:', email);
     const response = await api.post<AuthResponse>('/auth/login', { email, password });
     const { access_token, user } = response.data;
-    await AsyncStorage.setItem('token', access_token);
-    set({ user, token: access_token, isAuthenticated: true, needsOnboarding: false });
-  },
-
-  register: async (email, password, name, role) => {
-    const response = await api.post<AuthResponse>('/auth/register', { email, password, name, role });
-    const { access_token, user } = response.data;
-    await AsyncStorage.setItem('token', access_token);
-    set({ user, token: access_token, isAuthenticated: true, needsOnboarding: true });
-  },
-
-  exchangeSession: async (sessionId) => {
-    const response = await api.post<AuthResponse>('/auth/session', { session_id: sessionId });
-    const { access_token, user, needs_onboarding } = response.data;
-    await AsyncStorage.setItem('token', access_token);
+    console.log('[AuthStore] Login successful, saving token...');
+    
+    try {
+      await AsyncStorage.setItem('token', access_token);
+      console.log('[AuthStore] Token saved to AsyncStorage');
+    } catch (e) {
+      console.error('[AuthStore] Failed to save token:', e);
+    }
+    
     set({ 
       user, 
       token: access_token, 
       isAuthenticated: true, 
-      needsOnboarding: needs_onboarding || false 
+      needsOnboarding: false,
+      isLoading: false 
+    });
+    console.log('[AuthStore] State updated, isAuthenticated:', true);
+    return user;
+  },
+
+  register: async (email, password, name, role) => {
+    console.log('[AuthStore] Attempting registration for:', email);
+    const response = await api.post<AuthResponse>('/auth/register', { email, password, name, role });
+    const { access_token, user } = response.data;
+    
+    try {
+      await AsyncStorage.setItem('token', access_token);
+    } catch (e) {
+      console.error('[AuthStore] Failed to save token:', e);
+    }
+    
+    set({ 
+      user, 
+      token: access_token, 
+      isAuthenticated: true, 
+      needsOnboarding: true,
+      isLoading: false 
+    });
+    return user;
+  },
+
+  exchangeSession: async (sessionId) => {
+    console.log('[AuthStore] Exchanging session:', sessionId);
+    const response = await api.post<AuthResponse>('/auth/session', { session_id: sessionId });
+    const { access_token, user, needs_onboarding } = response.data;
+    
+    try {
+      await AsyncStorage.setItem('token', access_token);
+    } catch (e) {
+      console.error('[AuthStore] Failed to save token:', e);
+    }
+    
+    set({ 
+      user, 
+      token: access_token, 
+      isAuthenticated: true, 
+      needsOnboarding: needs_onboarding || false,
+      isLoading: false 
     });
     return response.data;
   },
 
   logout: async () => {
+    console.log('[AuthStore] Logging out...');
     try {
       await api.post('/auth/logout');
     } catch (e) {
       // Ignore logout errors
     }
-    await AsyncStorage.removeItem('token');
-    set({ user: null, token: null, isAuthenticated: false, needsOnboarding: false });
+    try {
+      await AsyncStorage.removeItem('token');
+    } catch (e) {
+      console.error('[AuthStore] Failed to remove token:', e);
+    }
+    set({ user: null, token: null, isAuthenticated: false, needsOnboarding: false, isLoading: false });
   },
 
   checkAuth: async () => {
+    console.log('[AuthStore] Checking auth...');
     set({ isLoading: true });
     try {
       const token = await AsyncStorage.getItem('token');
+      console.log('[AuthStore] Token from storage:', token ? 'exists' : 'none');
+      
       if (!token) {
         set({ isLoading: false, isAuthenticated: false });
         return;
       }
       
       const response = await api.get<User>('/auth/me');
+      console.log('[AuthStore] Auth check successful, user:', response.data.name);
       set({ 
         user: response.data, 
         token, 
@@ -84,7 +132,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         needsOnboarding: response.data.needs_onboarding || false
       });
     } catch (error) {
-      await AsyncStorage.removeItem('token');
+      console.error('[AuthStore] Auth check failed:', error);
+      try {
+        await AsyncStorage.removeItem('token');
+      } catch (e) {}
       set({ user: null, token: null, isAuthenticated: false, isLoading: false });
     }
   },
