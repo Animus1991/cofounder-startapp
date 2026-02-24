@@ -910,61 +910,64 @@ class BackendTester:
             return False
 
     async def run_comprehensive_tests(self):
-        """Run all backend API tests"""
-        print(f"🚀 Starting CoFounder Connect Backend API Tests")
+        """Run all backend API tests following the specific test sequence"""
+        print(f"🚀 Starting CoFounderBay v2.0 Backend API Tests")
         print(f"📍 Testing against: {BASE_URL}")
         print(f"=" * 60)
         
-        # Test registration and login for both users
-        registration_success = True
-        for user in TEST_USERS:
-            if not await self.test_registration(user):
-                registration_success = False
-            if not await self.test_login(user["email"], user["password"]):
-                registration_success = False
-                
-        if not registration_success:
-            print("❌ Authentication tests failed, skipping dependent tests")
+        # Specific test sequence as requested:
+        # 1. Register a new user with email: testfounderr@cofounderbay.com, password: Test1234!, name: Test Founder, role: founder
+        user = TEST_USERS[0]  # The specific test user
+        if not await self.test_registration(user):
+            print("❌ Registration failed, skipping dependent tests")
             return
             
-        # Test profile operations
-        for user in TEST_USERS:
-            await self.test_get_profile(user["email"])
-            await self.test_update_profile(user["email"])
+        # 2. Login and get token
+        if not await self.test_login(user["email"], user["password"]):
+            print("❌ Login failed, skipping dependent tests")
+            return
             
-        # Test posts functionality
-        await self.test_get_posts()  # Test without auth first
-        post_id = None
+        # Verify profile access
+        await self.test_get_profile(user["email"])
         
-        # Create post from first user
-        if TEST_USERS:
-            post_id = await self.test_create_post(TEST_USERS[0]["email"])
-            await self.test_get_posts(TEST_USERS[0]["email"])  # Test with auth
+        # 3. Create a post with the token
+        post_id = await self.test_create_post(user["email"])
+        
+        # 4. Get posts feed
+        await self.test_get_posts(user["email"])
+        
+        # 5. Like a post (using react endpoint)
+        if post_id:
+            await self.test_like_post(user["email"], post_id)
+            await self.test_comment_post(user["email"], post_id)
             
-            # Test interactions from second user
-            if len(TEST_USERS) > 1 and post_id:
-                await self.test_like_post(TEST_USERS[1]["email"], post_id)
-                await self.test_comment_post(TEST_USERS[1]["email"], post_id)
-                
-        # Test discovery
-        for user in TEST_USERS:
-            await self.test_discovery(user["email"])
-            
-        # Test connections (between users)
+        # 6. Browse users with role filter
+        await self.test_discovery(user["email"])
+        
+        # 7. Get opportunities
+        await self.test_get_opportunities(user["email"])
+        
+        # 8. Create an opportunity with the token
+        await self.test_create_opportunity(user["email"])
+        
+        # 9. Get connections
+        await self.test_get_connections(user["email"])
+        
+        # 10. Get conversations
+        await self.test_get_conversations(user["email"])
+        
+        # Test profile update capability
+        await self.test_update_profile(user["email"])
+        
+        # If we have a second user, test cross-user interactions
         if len(TEST_USERS) > 1:
-            await self.test_connection_request(TEST_USERS[0]["email"], TEST_USERS[1]["email"])
-            await self.test_get_connections(TEST_USERS[0]["email"])
-            await self.test_get_connections(TEST_USERS[1]["email"])
+            second_user = TEST_USERS[1]
             
-        # Test messaging (between users)
-        if len(TEST_USERS) > 1:
-            await self.test_send_message(TEST_USERS[0]["email"], TEST_USERS[1]["email"])
-            await self.test_get_conversations(TEST_USERS[0]["email"])
-            await self.test_get_conversations(TEST_USERS[1]["email"])
-            
-        # Test AI recommendations
-        for user in TEST_USERS:
-            await self.test_ai_recommendations(user["email"])
+            # Register/login second user
+            if await self.test_registration(second_user) and await self.test_login(second_user["email"], second_user["password"]):
+                # Test cross-user interactions
+                await self.test_connection_request(user["email"], second_user["email"])
+                await self.test_send_message(user["email"], second_user["email"])
 
     def print_summary(self):
         """Print test summary"""
