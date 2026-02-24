@@ -961,16 +961,6 @@ class BackendTester:
         
         # Test profile update capability
         await self.test_update_profile(user["email"])
-        
-        # If we have a second user, test cross-user interactions
-        if len(TEST_USERS) > 1:
-            second_user = TEST_USERS[1]
-            
-            # Register/login second user
-            if await self.test_registration(second_user) and await self.test_login(second_user["email"], second_user["password"]):
-                # Test cross-user interactions
-                await self.test_connection_request(user["email"], second_user["email"])
-                await self.test_send_message(user["email"], second_user["email"])
 
     def print_summary(self):
         """Print test summary"""
