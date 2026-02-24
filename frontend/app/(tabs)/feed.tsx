@@ -47,8 +47,7 @@ export default function FeedScreen() {
 
   const handleLike = async (postId: string) => {
     try {
-      await api.post(`/posts/${postId}/like`);
-      // Optimistic update already handled in PostCard
+      await api.post(`/posts/${postId}/react`, { type: 'like' });
     } catch (error) {
       console.error('Error liking post:', error);
     }
@@ -56,8 +55,7 @@ export default function FeedScreen() {
 
   const handleComment = async (postId: string, content: string) => {
     try {
-      await api.post(`/posts/${postId}/comment`, { content });
-      // Refresh to get updated comments
+      await api.post(`/posts/${postId}/comments`, { content });
       fetchPosts();
     } catch (error) {
       console.error('Error commenting:', error);
@@ -84,10 +82,12 @@ export default function FeedScreen() {
     setSubmitting(true);
     try {
       const tags = newPostTags.split(',').map(t => t.trim()).filter(t => t);
+      const media = newPostImage ? [newPostImage] : [];
       await api.post('/posts', {
         content: newPostContent,
-        image: newPostImage,
+        media,
         tags,
+        visibility: 'public'
       });
       setNewPostContent('');
       setNewPostImage(null);
@@ -109,7 +109,7 @@ export default function FeedScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>CoFounder Connect</Text>
+        <Text style={styles.headerTitle}>CoFounderBay</Text>
         <TouchableOpacity style={styles.notificationButton}>
           <Ionicons name="notifications-outline" size={24} color="#F9FAFB" />
         </TouchableOpacity>
@@ -120,7 +120,7 @@ export default function FeedScreen() {
         style={styles.createPostCard}
         onPress={() => setCreateModalVisible(true)}
       >
-        <Avatar uri={user?.profile_image} name={user?.name || ''} size={40} />
+        <Avatar uri={user?.profile?.profile_image} name={user?.name || ''} size={40} />
         <View style={styles.createPostInput}>
           <Text style={styles.createPostPlaceholder}>Share an update or idea...</Text>
         </View>
@@ -194,10 +194,10 @@ export default function FeedScreen() {
 
             <View style={styles.modalContent}>
               <View style={styles.authorRow}>
-                <Avatar uri={user?.profile_image} name={user?.name || ''} size={48} />
+                <Avatar uri={user?.profile?.profile_image} name={user?.name || ''} size={48} />
                 <View style={styles.authorInfo}>
                   <Text style={styles.authorName}>{user?.name}</Text>
-                  <Text style={styles.authorRole}>{user?.headline || user?.role}</Text>
+                  <Text style={styles.authorRole}>{user?.profile?.headline || user?.roles?.[0]}</Text>
                 </View>
               </View>
 
@@ -306,7 +306,6 @@ const styles = StyleSheet.create({
   emptyButton: {
     paddingHorizontal: 32,
   },
-  // Modal styles
   modalContainer: {
     flex: 1,
     backgroundColor: '#111827',

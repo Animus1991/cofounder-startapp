@@ -9,12 +9,12 @@ import { UserCard } from '../../src/components/UserCard';
 import { LoadingScreen } from '../../src/components/LoadingScreen';
 import api from '../../src/utils/api';
 
-const roleFilters: (UserRole | 'all')[] = ['all', 'founder', 'investor', 'mentor', 'service_provider', 'talent'];
+const roleFilters: (UserRole | 'all')[] = ['all', 'founder', 'investor', 'mentor', 'service_provider', 'talent', 'startup_team'];
 
 export default function DiscoverScreen() {
   const router = useRouter();
   const { user: currentUser } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'recommendations' | 'browse'>('recommendations');
+  const [activeTab, setActiveTab] = useState<'recommendations' | 'browse'>('browse');
   const [selectedRole, setSelectedRole] = useState<UserRole | 'all'>('all');
   const [recommendations, setRecommendations] = useState<AIRecommendation[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -46,7 +46,7 @@ export default function DiscoverScreen() {
       const params: any = { skip: newPage * 10, limit: 10 };
       if (selectedRole !== 'all') params.role = selectedRole;
 
-      const response = await api.get<User[]>('/discover', { params });
+      const response = await api.get<User[]>('/users', { params });
       
       if (reset) {
         setUsers(response.data);
@@ -92,8 +92,7 @@ export default function DiscoverScreen() {
   const handleConnect = async (userId: string) => {
     try {
       await api.post('/connections/request', { target_user_id: userId });
-      // Remove from lists
-      setRecommendations(prev => prev.filter(r => r.user_id !== userId));
+      setRecommendations(prev => prev.filter(r => r.user?.user_id !== userId));
       setUsers(prev => prev.filter(u => u.user_id !== userId));
     } catch (error) {
       console.error('Error sending connection request:', error);
@@ -168,27 +167,12 @@ export default function DiscoverScreen() {
       {activeTab === 'recommendations' ? (
         <FlatList
           data={recommendations}
-          keyExtractor={(item) => item.user_id}
+          keyExtractor={(item, index) => item.user?.user_id || `rec-${index}`}
           renderItem={({ item }) => (
             <UserCard
-              user={{
-                user_id: item.user_id,
-                name: item.user_name,
-                email: '',
-                role: item.user_role as UserRole,
-                headline: item.headline,
-                profile_image: item.user_image,
-                skills: [],
-                interests: [],
-                expertise_areas: [],
-                services_offered: [],
-                connection_count: 0,
-                post_count: 0,
-                is_verified: false,
-                created_at: '',
-              }}
-              onPress={() => router.push(`/user/${item.user_id}`)}
-              onConnect={() => handleConnect(item.user_id)}
+              user={item.user as User}
+              onPress={() => router.push(`/user/${item.user?.user_id}`)}
+              onConnect={() => handleConnect(item.user?.user_id || '')}
               matchScore={item.match_score}
               matchReason={item.match_reason}
             />
