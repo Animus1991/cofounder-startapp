@@ -50,12 +50,13 @@ export default function RootLayout() {
     if (isAuthenticated) {
       if (needsOnboarding) {
         router.replace('/(auth)/onboarding');
-      } else if (inAuthGroup || segments.length === 0 || segments[0] === 'index') {
-        router.replace('/(tabs)/feed');
+      } else if (inAuthGroup || segments.length === 0 || segments[0] === 'index' || segments[0] === 'landing') {
+        router.replace('/(tabs)/dashboard');
       }
     } else {
-      if (!inAuthGroup) {
-        router.replace('/(auth)/login');
+      // For non-authenticated users, show landing page or stay in auth group
+      if (!inAuthGroup && segments[0] !== 'landing') {
+        router.replace('/landing');
       }
     }
   }, [isAuthenticated, segments, navigationState?.key, isLoading, isCheckingSession, needsOnboarding]);
@@ -90,6 +91,7 @@ export default function RootLayout() {
         <Stack.Screen name="settings" options={{ headerShown: false }} />
         <Stack.Screen name="notifications" options={{ headerShown: false }} />
         <Stack.Screen name="pipeline" options={{ headerShown: false }} />
+        <Stack.Screen name="landing" options={{ headerShown: false }} />
       </Stack>
     </>
   );
