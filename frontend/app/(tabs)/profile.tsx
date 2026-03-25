@@ -72,6 +72,10 @@ export default function ProfileScreen() {
 
   if (!user) return null;
 
+  // Extract profile data safely
+  const profile = user.profile || {};
+  const primaryRole = user.roles?.[0] || 'founder';
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -79,9 +83,9 @@ export default function ProfileScreen() {
         <View style={styles.header}>
           {/* Cover Image */}
           <TouchableOpacity onPress={pickCoverImage} style={styles.coverContainer}>
-            {user.cover_image ? (
+            {profile.cover_image ? (
               <Image 
-                source={{ uri: user.cover_image }} 
+                source={{ uri: profile.cover_image }} 
                 style={styles.coverImage} 
               />
             ) : (
@@ -98,7 +102,7 @@ export default function ProfileScreen() {
           {/* Profile Info */}
           <View style={styles.profileSection}>
             <TouchableOpacity onPress={pickProfileImage} style={styles.avatarContainer}>
-              <Avatar uri={user.profile_image} name={user.name} size={100} />
+              <Avatar uri={profile.profile_image} name={user.name} size={100} />
               <View style={styles.avatarEditBadge}>
                 <Ionicons name="camera" size={14} color="#FFFFFF" />
               </View>
@@ -106,17 +110,17 @@ export default function ProfileScreen() {
 
             <View style={styles.nameSection}>
               <Text style={styles.name}>{user.name}</Text>
-              <RoleBadge role={user.role as any} size="medium" />
+              <RoleBadge role={primaryRole as any} size="medium" />
             </View>
 
-            {user.headline && (
-              <Text style={styles.headline}>{user.headline}</Text>
+            {profile.headline && (
+              <Text style={styles.headline}>{profile.headline}</Text>
             )}
 
-            {user.location && (
+            {profile.location && (
               <View style={styles.locationRow}>
                 <Ionicons name="location-outline" size={16} color="#9CA3AF" />
-                <Text style={styles.location}>{user.location}</Text>
+                <Text style={styles.location}>{profile.location}</Text>
               </View>
             )}
 
@@ -143,30 +147,30 @@ export default function ProfileScreen() {
         </View>
 
         {/* Bio Section */}
-        {user.bio && (
+        {profile.bio && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About</Text>
-            <Text style={styles.bioText}>{user.bio}</Text>
+            <Text style={styles.bioText}>{profile.bio}</Text>
           </View>
         )}
 
         {/* Looking For */}
-        {user.looking_for && (
+        {profile.looking_for && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Looking For</Text>
             <View style={styles.lookingForCard}>
               <Ionicons name="search" size={20} color="#6366F1" />
-              <Text style={styles.lookingForText}>{user.looking_for}</Text>
+              <Text style={styles.lookingForText}>{profile.looking_for}</Text>
             </View>
           </View>
         )}
 
         {/* Skills */}
-        {user.skills.length > 0 && (
+        {profile.skills && profile.skills.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Skills</Text>
             <View style={styles.tagsContainer}>
-              {user.skills.map((skill, index) => (
+              {profile.skills.map((skill: string, index: number) => (
                 <View key={index} style={styles.tag}>
                   <Text style={styles.tagText}>{skill}</Text>
                 </View>
@@ -176,11 +180,11 @@ export default function ProfileScreen() {
         )}
 
         {/* Interests */}
-        {user.interests.length > 0 && (
+        {profile.interests && profile.interests.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Interests</Text>
             <View style={styles.tagsContainer}>
-              {user.interests.map((interest, index) => (
+              {profile.interests.map((interest: string, index: number) => (
                 <View key={index} style={[styles.tag, styles.interestTag]}>
                   <Text style={[styles.tagText, styles.interestTagText]}>{interest}</Text>
                 </View>
@@ -193,13 +197,13 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Links</Text>
           <View style={styles.linksContainer}>
-            {user.linkedin_url && (
+            {profile.linkedin_url && (
               <TouchableOpacity style={styles.linkButton}>
                 <Ionicons name="logo-linkedin" size={20} color="#0A66C2" />
                 <Text style={styles.linkText}>LinkedIn</Text>
               </TouchableOpacity>
             )}
-            {user.website && (
+            {profile.website && (
               <TouchableOpacity style={styles.linkButton}>
                 <Ionicons name="globe-outline" size={20} color="#6366F1" />
                 <Text style={styles.linkText}>Website</Text>

@@ -162,6 +162,7 @@ export default function UserProfileScreen() {
                     title="Pending"
                     variant="outline"
                     disabled
+                    onPress={() => {}}
                     style={styles.connectButton}
                   />
                 )}
@@ -169,6 +170,7 @@ export default function UserProfileScreen() {
                   <Button
                     title="Connected"
                     variant="outline"
+                    onPress={() => {}}
                     style={styles.connectButton}
                   />
                 )}

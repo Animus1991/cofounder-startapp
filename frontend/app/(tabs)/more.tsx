@@ -7,10 +7,12 @@ import { useRouter } from 'expo-router';
 const menuItems = [
   { id: 'events', title: 'Events', icon: 'calendar-outline', color: '#6366F1', description: 'Discover startup events' },
   { id: 'marketplace', title: 'Marketplace', icon: 'cart-outline', color: '#10B981', description: 'Tools & services for startups' },
-  { id: 'mentoring', title: 'Mentoring', icon: 'school-outline', color: '#F59E0B', description: 'Find mentors & book sessions' },
-  { id: 'learning', title: 'Learning', icon: 'library-outline', color: '#EC4899', description: 'Courses & resources' },
+  { id: 'mentoring', title: 'Mentoring', icon: 'bulb-outline', color: '#F59E0B', description: 'Find mentors & book sessions' },
+  { id: 'learning', title: 'Learning', icon: 'book-outline', color: '#EC4899', description: 'Courses & resources' },
   { id: 'groups', title: 'Groups', icon: 'people-outline', color: '#8B5CF6', description: 'Join communities' },
-  { id: 'profile', title: 'My Profile', icon: 'person-outline', color: '#06B6D4', description: 'View & edit your profile' },
+  { id: 'connections', title: 'My Network', icon: 'git-network-outline', color: '#06B6D4', description: 'Manage your connections' },
+  { id: 'profile', title: 'My Profile', icon: 'person-circle-outline', color: '#EF4444', description: 'View & edit your profile' },
+  { id: 'settings', title: 'Settings', icon: 'settings-outline', color: '#6B7280', description: 'App preferences' },
 ];
 
 export default function MoreScreen() {
@@ -33,8 +35,14 @@ export default function MoreScreen() {
       case 'groups':
         router.push('/groups');
         break;
+      case 'connections':
+        router.push('/(tabs)/connections');
+        break;
       case 'profile':
-        router.push('/profile');
+        router.push('/(tabs)/profile');
+        break;
+      case 'settings':
+        // TODO: Navigate to settings screen
         break;
     }
   };
@@ -63,18 +71,7 @@ export default function MoreScreen() {
         </View>
 
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.footerLink}>
-            <Ionicons name="settings-outline" size={20} color="#9CA3AF" />
-            <Text style={styles.footerText}>Settings</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.footerLink}>
-            <Ionicons name="help-circle-outline" size={20} color="#9CA3AF" />
-            <Text style={styles.footerText}>Help & Support</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.footerLink}>
-            <Ionicons name="document-text-outline" size={20} color="#9CA3AF" />
-            <Text style={styles.footerText}>Terms & Privacy</Text>
-          </TouchableOpacity>
+          <Text style={styles.footerText}>CoFounderBay v2.0</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -134,15 +131,10 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     borderTopWidth: 1,
     borderTopColor: '#1F2937',
-  },
-  footerLink: {
-    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
   },
   footerText: {
-    fontSize: 15,
-    color: '#9CA3AF',
-    marginLeft: 12,
+    fontSize: 13,
+    color: '#6B7280',
   },
 });

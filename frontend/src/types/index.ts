@@ -381,6 +381,27 @@ export interface IntroRequest {
   to_user?: Partial<User>;
 }
 
+// Connection
+export interface Connection {
+  connection_id: string;
+  user_id: string;
+  connected_user_id: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  message?: string;
+  is_sender: boolean;
+  created_at: string;
+  accepted_at?: string;
+  other_user?: {
+    user_id: string;
+    name: string;
+    email: string;
+    role: UserRole;
+    headline?: string;
+    profile_image?: string;
+    location?: string;
+  };
+}
+
 // Posts
 export interface Post {
   post_id: string;
