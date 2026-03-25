@@ -83,6 +83,13 @@ export default function RootLayout() {
         <Stack.Screen name="groups" options={{ headerShown: false }} />
         <Stack.Screen name="profile" options={{ headerShown: false }} />
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="admin" options={{ headerShown: false }} />
+        <Stack.Screen name="matches" options={{ headerShown: false }} />
+        <Stack.Screen name="communities" options={{ headerShown: false }} />
+        <Stack.Screen name="milestones" options={{ headerShown: false }} />
+        <Stack.Screen name="settings" options={{ headerShown: false }} />
+        <Stack.Screen name="notifications" options={{ headerShown: false }} />
+        <Stack.Screen name="pipeline" options={{ headerShown: false }} />
       </Stack>
     </>
   );

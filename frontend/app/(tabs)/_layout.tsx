@@ -1,12 +1,46 @@
 import React from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, useSegments } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { View, StyleSheet, Platform, Text } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { useAuthStore } from '../../src/store/authStore';
+import { useResponsive } from '../../src/hooks/useResponsive';
+import Sidebar from '../../src/components/layout/Sidebar';
 
 export default function TabsLayout() {
   const { user } = useAuthStore();
+  const { showSidebar, sidebarWidth, isMobile } = useResponsive();
+  const segments = useSegments();
   
+  // Get current active route for sidebar highlighting
+  const activeRoute = segments[1] || 'dashboard';
+  
+  // For desktop/tablet: Use sidebar layout
+  if (showSidebar) {
+    return (
+      <View style={styles.desktopContainer}>
+        <Sidebar width={sidebarWidth} activeRoute={activeRoute} />
+        <View style={[styles.mainContent, { marginLeft: sidebarWidth }]}>
+          <Tabs
+            screenOptions={{
+              headerShown: false,
+              tabBarStyle: { display: 'none' }, // Hide tab bar on desktop
+            }}
+          >
+            <Tabs.Screen name="dashboard" />
+            <Tabs.Screen name="discover" />
+            <Tabs.Screen name="opportunities" />
+            <Tabs.Screen name="messages" />
+            <Tabs.Screen name="more" />
+            <Tabs.Screen name="feed" options={{ href: null }} />
+            <Tabs.Screen name="connections" options={{ href: null }} />
+            <Tabs.Screen name="profile" options={{ href: null }} />
+          </Tabs>
+        </View>
+      </View>
+    );
+  }
+  
+  // For mobile: Use bottom tab bar
   return (
     <Tabs
       screenOptions={{
@@ -87,6 +121,14 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
+  desktopContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#111827',
+  },
+  mainContent: {
+    flex: 1,
+  },
   tabBar: {
     backgroundColor: '#1F2937',
     borderTopColor: '#374151',
