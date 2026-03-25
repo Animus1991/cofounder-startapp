@@ -26,6 +26,8 @@ interface MatchResult {
   complementarySkills: string[];
   sharedInterests: string[];
   mismatchFlags: string[];
+  aiInsights?: string;
+  collaborationPotential?: string;
 }
 
 const MATCH_WEIGHTS = {
@@ -168,6 +170,45 @@ export default function MatchesScreen() {
   const fetchMatches = useCallback(async () => {
     try {
       setLoading(true);
+      
+      // Try AI-powered matches first
+      try {
+        const response = await api.post('/ai-matches', {
+          min_score: filters.minScore,
+          limit: 20,
+          role_filter: filters.role || null,
+        });
+        
+        if (response.data?.matches?.length > 0) {
+          const aiMatches = response.data.matches.map((m: any) => ({
+            user: {
+              user_id: m.user_id,
+              name: m.name,
+              roles: m.roles,
+              profile: {
+                headline: m.headline,
+                profile_image: m.profile_image,
+                location: m.location,
+                skills: m.skills,
+                sectors: m.sectors,
+              }
+            },
+            score: m.match_score,
+            matchReasons: m.match_reasons || [],
+            complementarySkills: m.complementary_skills || [],
+            sharedInterests: m.shared_interests || [],
+            mismatchFlags: [],
+            aiInsights: m.ai_insights || '',
+            collaborationPotential: m.collaboration_potential || '',
+          }));
+          setMatches(aiMatches);
+          return;
+        }
+      } catch (aiError) {
+        console.log('AI matches not available, falling back to basic matching');
+      }
+      
+      // Fallback to basic matching
       const response = await api.get('/users?limit=50');
       const allUsers = response.data || [];
       
@@ -266,6 +307,25 @@ export default function MatchesScreen() {
               </View>
             ))}
           </View>
+        </View>
+      )}
+
+      {/* AI Insights */}
+      {(match.aiInsights || match.collaborationPotential) && (
+        <View style={styles.aiInsightsSection}>
+          <View style={styles.aiInsightsHeader}>
+            <Ionicons name="sparkles" size={16} color="#8B5CF6" />
+            <Text style={styles.aiInsightsTitle}>AI Insights</Text>
+          </View>
+          {match.collaborationPotential && (
+            <Text style={styles.aiInsightsText}>{match.collaborationPotential}</Text>
+          )}
+          {match.aiInsights && (
+            <View style={styles.aiSuggestion}>
+              <Ionicons name="bulb-outline" size={14} color="#F59E0B" />
+              <Text style={styles.aiSuggestionText}>{match.aiInsights}</Text>
+            </View>
+          )}
         </View>
       )}
 
@@ -686,5 +746,45 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
     paddingHorizontal: 32,
+  },
+  aiInsightsSection: {
+    backgroundColor: '#8B5CF610',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#8B5CF630',
+  },
+  aiInsightsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  aiInsightsTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
+  aiInsightsText: {
+    fontSize: 14,
+    color: '#D1D5DB',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  aiSuggestion: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F59E0B10',
+    padding: 10,
+    borderRadius: 8,
+    gap: 8,
+    marginTop: 4,
+  },
+  aiSuggestionText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#F59E0B',
+    lineHeight: 18,
   },
 });

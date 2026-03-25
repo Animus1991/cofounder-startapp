@@ -494,9 +494,137 @@ class CoFounderBayTester:
                 f"Exception: {str(e)}"
             )
     
+    def test_ai_matching_engine(self):
+        """Test AI Matching Engine endpoint"""
+        print("🤖 Testing AI Matching Engine...")
+        
+        if not self.auth_token:
+            self.log_test("AI Matching Engine", False, "No auth token available")
+            return
+        
+        try:
+            # Test POST /api/ai-matches with specified parameters
+            match_request = {
+                "min_score": 40,
+                "limit": 10
+            }
+            
+            response = self.session.post(f"{self.base_url}/ai-matches", json=match_request)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Validate response structure
+                if "matches" in data:
+                    matches = data["matches"]
+                    self.log_test(
+                        "AI Matching Engine - POST /api/ai-matches",
+                        True,
+                        f"Retrieved {len(matches)} matches with min_score={match_request['min_score']}"
+                    )
+                    
+                    # Validate match structure
+                    if matches:
+                        match = matches[0]
+                        required_fields = [
+                            "user_id", "name", "roles", "match_score", 
+                            "match_reasons", "complementary_skills", "shared_interests"
+                        ]
+                        missing_fields = [field for field in required_fields if field not in match]
+                        
+                        if not missing_fields:
+                            self.log_test(
+                                "AI Matching Engine - Match Structure",
+                                True,
+                                "Match structure contains all required fields"
+                            )
+                            
+                            # Check if AI insights are present (optional fields)
+                            ai_fields = ["ai_insights", "collaboration_potential"]
+                            ai_present = [field for field in ai_fields if field in match and match[field]]
+                            
+                            if ai_present:
+                                self.log_test(
+                                    "AI Matching Engine - AI Insights",
+                                    True,
+                                    f"AI insights working: {', '.join(ai_present)} fields populated"
+                                )
+                            else:
+                                self.log_test(
+                                    "AI Matching Engine - AI Insights",
+                                    False,
+                                    "AI insights fields (ai_insights, collaboration_potential) are empty - check OpenAI GPT-4o integration"
+                                )
+                            
+                            # Validate match scores are above minimum
+                            scores_valid = all(m.get("match_score", 0) >= match_request["min_score"] for m in matches)
+                            if scores_valid:
+                                self.log_test(
+                                    "AI Matching Engine - Score Filtering",
+                                    True,
+                                    f"All matches have scores >= {match_request['min_score']}"
+                                )
+                            else:
+                                invalid_scores = [m.get("match_score", 0) for m in matches if m.get("match_score", 0) < match_request["min_score"]]
+                                self.log_test(
+                                    "AI Matching Engine - Score Filtering",
+                                    False,
+                                    f"Some matches have scores below minimum: {invalid_scores}"
+                                )
+                                
+                        else:
+                            self.log_test(
+                                "AI Matching Engine - Match Structure",
+                                False,
+                                f"Missing required fields: {missing_fields}",
+                                match
+                            )
+                    else:
+                        self.log_test(
+                            "AI Matching Engine - Match Structure",
+                            True,
+                            "No matches returned (empty list is valid for high min_score)"
+                        )
+                        
+                    # Test response metadata
+                    if "total" in data:
+                        self.log_test(
+                            "AI Matching Engine - Response Metadata",
+                            True,
+                            f"Response includes total count: {data['total']}"
+                        )
+                    else:
+                        self.log_test(
+                            "AI Matching Engine - Response Metadata",
+                            False,
+                            "Missing 'total' field in response"
+                        )
+                        
+                else:
+                    self.log_test(
+                        "AI Matching Engine - POST /api/ai-matches",
+                        False,
+                        "Response missing 'matches' field",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "AI Matching Engine - POST /api/ai-matches",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+                
+        except Exception as e:
+            self.log_test(
+                "AI Matching Engine",
+                False,
+                f"Exception: {str(e)}"
+            )
+    
     def run_all_tests(self):
         """Run all Phase 3 backend API tests"""
-        print("🚀 Starting CoFounderBay Phase 3 Backend API Tests")
+        print("🚀 Starting CoFounderBay Backend API Tests")
         print("=" * 60)
         print()
         
@@ -518,6 +646,10 @@ class CoFounderBayTester:
         print()
         
         self.test_connections_api()
+        print()
+        
+        # Test AI Matching Engine (new endpoint)
+        self.test_ai_matching_engine()
         print()
         
         # Summary
