@@ -42,7 +42,7 @@ export default function MoreScreen() {
         router.push('/(tabs)/profile');
         break;
       case 'settings':
-        // TODO: Navigate to settings screen
+        router.push('/settings');
         break;
     }
   };

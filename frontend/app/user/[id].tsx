@@ -1,10 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  TouchableOpacity, 
+  Image,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuthStore } from '../../src/store/authStore';
-import { User, UserRole } from '../../src/types';
+import { User, UserRole, Connection } from '../../src/types';
 import { Avatar } from '../../src/components/Avatar';
 import { RoleBadge } from '../../src/components/RoleBadge';
 import { Button } from '../../src/components/Button';
@@ -18,12 +30,34 @@ export default function UserProfileScreen() {
   const { user: currentUser } = useAuthStore();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [connectionStatus, setConnectionStatus] = useState<'none' | 'pending' | 'connected'>('none');
+  const [connectionStatus, setConnectionStatus] = useState<'none' | 'pending_sent' | 'pending_received' | 'connected'>('none');
+  const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [connectModalVisible, setConnectModalVisible] = useState(false);
+  const [connectMessage, setConnectMessage] = useState('');
+  const [sending, setSending] = useState(false);
 
   const fetchUser = async () => {
     try {
-      const response = await api.get<User>(`/users/${id}`);
-      setUser(response.data);
+      const [userResponse, connectionsResponse] = await Promise.all([
+        api.get<User>(`/users/${id}`),
+        api.get<Connection[]>('/connections'),
+      ]);
+      
+      setUser(userResponse.data);
+      
+      // Check connection status
+      const connection = connectionsResponse.data?.find(
+        (c) => c.connected_user_id === id || c.other_user?.user_id === id
+      );
+      
+      if (connection) {
+        setConnectionId(connection.connection_id);
+        if (connection.status === 'accepted') {
+          setConnectionStatus('connected');
+        } else if (connection.status === 'pending') {
+          setConnectionStatus(connection.is_sender ? 'pending_sent' : 'pending_received');
+        }
+      }
     } catch (error) {
       console.error('Error fetching user:', error);
     } finally {
@@ -37,15 +71,36 @@ export default function UserProfileScreen() {
     }
   }, [id]);
 
-  const handleConnect = async () => {
+  const handleConnect = () => {
+    setConnectMessage(`Hi ${user?.name}, I'd like to connect with you!`);
+    setConnectModalVisible(true);
+  };
+
+  const sendConnectionRequest = async () => {
     try {
+      setSending(true);
       await api.post('/intro-requests', {
         to_user_id: id,
-        message: `Hi ${user?.name}, I'd like to connect with you!`
+        message: connectMessage,
       });
-      setConnectionStatus('pending');
-    } catch (error) {
-      console.error('Error sending connection request:', error);
+      setConnectionStatus('pending_sent');
+      setConnectModalVisible(false);
+      Alert.alert('Request Sent', 'Your connection request has been sent!');
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.detail || 'Failed to send request');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleAcceptRequest = async () => {
+    if (!connectionId) return;
+    try {
+      await api.put(`/connections/${connectionId}/accept`);
+      setConnectionStatus('connected');
+      Alert.alert('Connected', `You are now connected with ${user?.name}!`);
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.detail || 'Failed to accept request');
     }
   };
 
@@ -157,12 +212,19 @@ export default function UserProfileScreen() {
                     style={styles.connectButton}
                   />
                 )}
-                {connectionStatus === 'pending' && (
+                {connectionStatus === 'pending_sent' && (
                   <Button
-                    title="Pending"
+                    title="Request Sent"
                     variant="outline"
                     disabled
                     onPress={() => {}}
+                    style={styles.connectButton}
+                  />
+                )}
+                {connectionStatus === 'pending_received' && (
+                  <Button
+                    title="Accept Request"
+                    onPress={handleAcceptRequest}
                     style={styles.connectButton}
                   />
                 )}
@@ -172,11 +234,12 @@ export default function UserProfileScreen() {
                     variant="outline"
                     onPress={() => {}}
                     style={styles.connectButton}
+                    disabled
                   />
                 )}
                 <Button
                   title="Message"
-                  variant="outline"
+                  variant={connectionStatus === 'connected' ? 'primary' : 'outline'}
                   onPress={handleMessage}
                   style={styles.messageButton}
                 />
@@ -273,6 +336,63 @@ export default function UserProfileScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Connect Request Modal */}
+      <Modal
+        visible={connectModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setConnectModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <SafeAreaView style={styles.modalSafeArea}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setConnectModalVisible(false)}>
+                <Text style={styles.modalCancel}>Cancel</Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Connect</Text>
+              <TouchableOpacity onPress={sendConnectionRequest} disabled={sending}>
+                <Text style={[styles.modalSend, sending && styles.modalSendDisabled]}>
+                  {sending ? 'Sending...' : 'Send'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalContent}>
+              <View style={styles.modalUserInfo}>
+                <Avatar uri={user?.profile?.profile_image} name={user?.name || ''} size={60} />
+                <Text style={styles.modalUserName}>{user?.name}</Text>
+                <Text style={styles.modalUserHeadline}>{user?.profile?.headline}</Text>
+              </View>
+
+              <View style={styles.modalFormGroup}>
+                <Text style={styles.modalLabel}>Add a personalized message</Text>
+                <TextInput
+                  style={styles.modalTextArea}
+                  value={connectMessage}
+                  onChangeText={setConnectMessage}
+                  placeholder="Write a brief message..."
+                  placeholderTextColor="#6B7280"
+                  multiline
+                  numberOfLines={4}
+                  maxLength={300}
+                />
+                <Text style={styles.charCount}>{connectMessage.length}/300</Text>
+              </View>
+
+              <View style={styles.modalTip}>
+                <Ionicons name="bulb-outline" size={20} color="#F59E0B" />
+                <Text style={styles.modalTipText}>
+                  Personalized messages increase your chance of connecting by 3x!
+                </Text>
+              </View>
+            </View>
+          </SafeAreaView>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -471,5 +591,99 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#F9FAFB',
     marginTop: 16,
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#111827',
+  },
+  modalSafeArea: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1F2937',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#F9FAFB',
+  },
+  modalCancel: {
+    fontSize: 16,
+    color: '#9CA3AF',
+  },
+  modalSend: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6366F1',
+  },
+  modalSendDisabled: {
+    color: '#6B7280',
+  },
+  modalContent: {
+    flex: 1,
+    padding: 16,
+  },
+  modalUserInfo: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  modalUserName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#F9FAFB',
+    marginTop: 12,
+  },
+  modalUserHeadline: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  modalFormGroup: {
+    marginBottom: 20,
+  },
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#9CA3AF',
+    marginBottom: 8,
+  },
+  modalTextArea: {
+    backgroundColor: '#1F2937',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 15,
+    color: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#374151',
+    minHeight: 120,
+    textAlignVertical: 'top',
+  },
+  charCount: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'right',
+    marginTop: 6,
+  },
+  modalTip: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F59E0B10',
+    borderRadius: 12,
+    padding: 14,
+    gap: 10,
+  },
+  modalTipText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#F59E0B',
+    lineHeight: 20,
   },
 });

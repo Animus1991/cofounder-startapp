@@ -67,7 +67,7 @@ export default function InvestorDashboard({ data, user }: Props) {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Deal Pipeline</Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/pipeline')}>
             <Text style={styles.sectionLink}>View All</Text>
           </TouchableOpacity>
         </View>

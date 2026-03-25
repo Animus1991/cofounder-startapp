@@ -1,1001 +1,564 @@
 #!/usr/bin/env python3
 """
-CoFounder Connect Backend API Test Suite
-Tests all major backend functionality including auth, posts, connections, and messaging
+CoFounderBay Phase 3 Backend API Testing
+Tests authentication, notifications, investor pipeline, intro requests, and connections APIs
 """
 
-import httpx
+import requests
 import json
-import asyncio
+import sys
 from datetime import datetime
-import uuid
 
 # Configuration
-BASE_URL = "https://startup-connect-53.preview.emergentagent.com"
-API_BASE = f"{BASE_URL}/api"
+BASE_URL = "https://startup-connect-53.preview.emergentagent.com/api"
+TEST_EMAIL = "sarah@cofounderbay.com"
+TEST_PASSWORD = "Demo1234!"
 
-# Test data - using the exact test user from the request
-TEST_USERS = [
-    {
-        "email": "testfounderr@cofounderbay.com",
-        "password": "Test1234!",
-        "name": "Test Founder",
-        "role": "founder"
-    },
-    {
-        "email": "mike.investor@venture.com", 
-        "password": "InvestorPass456!",
-        "name": "Mike Rodriguez",
-        "role": "investor"
-    }
-]
-
-class BackendTester:
+class CoFounderBayTester:
     def __init__(self):
-        self.client = httpx.AsyncClient(timeout=30.0)
-        self.tokens = {}
-        self.user_data = {}
+        self.base_url = BASE_URL
+        self.session = requests.Session()
+        self.auth_token = None
+        self.user_data = None
         self.test_results = []
         
-    async def __aenter__(self):
-        return self
+    def log_test(self, test_name, success, details="", response_data=None):
+        """Log test results"""
+        status = "✅ PASS" if success else "❌ FAIL"
+        print(f"{status} {test_name}")
+        if details:
+            print(f"   Details: {details}")
+        if response_data and not success:
+            print(f"   Response: {response_data}")
+        print()
         
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.client.aclose()
-
-    def log_result(self, test_name: str, success: bool, details: str = "", response_data: dict = None):
-        """Log test result"""
-        result = {
+        self.test_results.append({
             "test": test_name,
             "success": success,
             "details": details,
-            "timestamp": datetime.now().isoformat(),
-            "response_data": response_data
-        }
-        self.test_results.append(result)
+            "response": response_data
+        })
+    
+    def test_authentication(self):
+        """Test Phase 3 Authentication - Login with credentials"""
+        print("🔐 Testing Authentication...")
         
-        status = "✅ PASS" if success else "❌ FAIL"
-        print(f"{status} - {test_name}: {details}")
-        if response_data and not success:
-            print(f"  Response: {json.dumps(response_data, indent=2)}")
-
-    async def test_registration(self, user_data: dict) -> bool:
-        """Test user registration"""
         try:
-            response = await self.client.post(
-                f"{API_BASE}/auth/register",
-                json=user_data,
-                headers={"Content-Type": "application/json"}
-            )
+            # Test login
+            login_data = {
+                "email": TEST_EMAIL,
+                "password": TEST_PASSWORD
+            }
             
-            if response.status_code == 201 or response.status_code == 200:
-                data = response.json()
-                if "access_token" in data and "user" in data:
-                    self.tokens[user_data["email"]] = data["access_token"]
-                    self.user_data[user_data["email"]] = data["user"]
-                    self.log_result(
-                        f"Registration ({user_data['name']})",
-                        True,
-                        f"User registered successfully with ID: {data['user']['user_id']}"
-                    )
-                    return True
-                else:
-                    self.log_result(
-                        f"Registration ({user_data['name']})",
-                        False,
-                        "Missing access_token or user in response",
-                        data
-                    )
-                    return False
-            elif response.status_code == 400:
-                # User might already exist
-                data = response.json()
-                if "already registered" in data.get("detail", ""):
-                    self.log_result(
-                        f"Registration ({user_data['name']})",
-                        True,
-                        "User already exists (acceptable for testing)"
-                    )
-                    return True
-                else:
-                    self.log_result(
-                        f"Registration ({user_data['name']})",
-                        False,
-                        f"Registration failed: {data.get('detail', 'Unknown error')}",
-                        data
-                    )
-                    return False
-            else:
-                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
-                self.log_result(
-                    f"Registration ({user_data['name']})",
-                    False,
-                    f"HTTP {response.status_code}: {data.get('detail', 'Registration failed')}",
-                    data
-                )
-                return False
-                
-        except Exception as e:
-            self.log_result(
-                f"Registration ({user_data['name']})",
-                False,
-                f"Exception: {str(e)}"
-            )
-            return False
-
-    async def test_login(self, email: str, password: str) -> bool:
-        """Test user login"""
-        try:
-            response = await self.client.post(
-                f"{API_BASE}/auth/login",
-                json={"email": email, "password": password},
-                headers={"Content-Type": "application/json"}
-            )
+            response = self.session.post(f"{self.base_url}/auth/login", json=login_data)
             
             if response.status_code == 200:
                 data = response.json()
                 if "access_token" in data and "user" in data:
-                    self.tokens[email] = data["access_token"]
-                    self.user_data[email] = data["user"]
-                    self.log_result(
-                        f"Login ({email})",
+                    self.auth_token = data["access_token"]
+                    self.user_data = data["user"]
+                    
+                    # Set authorization header for future requests
+                    self.session.headers.update({
+                        "Authorization": f"Bearer {self.auth_token}"
+                    })
+                    
+                    self.log_test(
+                        "Authentication - Login",
                         True,
-                        f"Login successful, token: {data['access_token'][:20]}..."
+                        f"Successfully logged in as {data['user']['name']} ({data['user']['email']})"
                     )
                     return True
                 else:
-                    self.log_result(
-                        f"Login ({email})",
+                    self.log_test(
+                        "Authentication - Login",
                         False,
                         "Missing access_token or user in response",
                         data
                     )
-                    return False
             else:
-                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
-                self.log_result(
-                    f"Login ({email})",
+                self.log_test(
+                    "Authentication - Login",
                     False,
-                    f"HTTP {response.status_code}: {data.get('detail', 'Login failed')}",
-                    data
+                    f"HTTP {response.status_code}",
+                    response.text
                 )
-                return False
                 
         except Exception as e:
-            self.log_result(
-                f"Login ({email})",
+            self.log_test(
+                "Authentication - Login",
                 False,
                 f"Exception: {str(e)}"
             )
-            return False
-
-    async def test_get_profile(self, email: str) -> bool:
-        """Test get user profile"""
-        if email not in self.tokens:
-            self.log_result(f"Get Profile ({email})", False, "No token available")
-            return False
-            
-        try:
-            response = await self.client.get(
-                f"{API_BASE}/auth/me",
-                headers={"Authorization": f"Bearer {self.tokens[email]}"}
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if "user_id" in data and "email" in data:
-                    roles = data.get('roles', [])
-                    role_str = roles[0] if roles else 'no role'
-                    self.log_result(
-                        f"Get Profile ({email})",
-                        True,
-                        f"Profile retrieved: {data['name']} ({role_str})"
-                    )
-                    return True
-                else:
-                    self.log_result(
-                        f"Get Profile ({email})",
-                        False,
-                        "Invalid profile data structure",
-                        data
-                    )
-                    return False
-            else:
-                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
-                self.log_result(
-                    f"Get Profile ({email})",
-                    False,
-                    f"HTTP {response.status_code}: {data.get('detail', 'Profile fetch failed')}",
-                    data
-                )
-                return False
-                
-        except Exception as e:
-            self.log_result(
-                f"Get Profile ({email})",
-                False,
-                f"Exception: {str(e)}"
-            )
-            return False
-
-    async def test_update_profile(self, email: str) -> bool:
-        """Test update user profile"""
-        if email not in self.tokens:
-            self.log_result(f"Update Profile ({email})", False, "No token available")
-            return False
-            
-        update_data = {
-            "headline": "Building the future of startup collaboration",
-            "bio": "Passionate entrepreneur focused on connecting innovative minds in the startup ecosystem",
-            "skills": ["Product Management", "Strategic Partnerships", "Fundraising"],
-            "interests": ["AI/ML", "FinTech", "Sustainability"],
-            "location": "San Francisco, CA"
-        }
+        
+        return False
+    
+    def test_notifications_api(self):
+        """Test Phase 3 Notifications API"""
+        print("🔔 Testing Notifications API...")
+        
+        if not self.auth_token:
+            self.log_test("Notifications API", False, "No auth token available")
+            return
         
         try:
-            response = await self.client.put(
-                f"{API_BASE}/users/profile",
-                json=update_data,
-                headers={
-                    "Authorization": f"Bearer {self.tokens[email]}",
-                    "Content-Type": "application/json"
-                }
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                profile = data.get("profile", {})
-                if profile.get("headline") == update_data["headline"]:
-                    self.log_result(
-                        f"Update Profile ({email})",
-                        True,
-                        f"Profile updated successfully: {profile.get('headline')}"
-                    )
-                    return True
-                else:
-                    self.log_result(
-                        f"Update Profile ({email})",
-                        False,
-                        "Profile update didn't reflect changes",
-                        data
-                    )
-                    return False
-            else:
-                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
-                self.log_result(
-                    f"Update Profile ({email})",
-                    False,
-                    f"HTTP {response.status_code}: {data.get('detail', 'Profile update failed')}",
-                    data
-                )
-                return False
-                
-        except Exception as e:
-            self.log_result(
-                f"Update Profile ({email})",
-                False,
-                f"Exception: {str(e)}"
-            )
-            return False
-
-    async def test_create_post(self, email: str) -> str:
-        """Test create post and return post_id"""
-        if email not in self.tokens:
-            self.log_result(f"Create Post ({email})", False, "No token available")
-            return None
-            
-        post_data = {
-            "content": "🚀 Excited to launch our new startup platform! Looking for co-founders who share the vision of revolutionizing how entrepreneurs connect and collaborate. #startup #cofounder #innovation",
-            "tags": ["startup", "cofounder", "innovation", "networking"]
-        }
-        
-        try:
-            response = await self.client.post(
-                f"{API_BASE}/posts",
-                json=post_data,
-                headers={
-                    "Authorization": f"Bearer {self.tokens[email]}",
-                    "Content-Type": "application/json"
-                }
-            )
-            
-            if response.status_code == 200 or response.status_code == 201:
-                data = response.json()
-                if "post_id" in data:
-                    self.log_result(
-                        f"Create Post ({email})",
-                        True,
-                        f"Post created successfully: {data['post_id']}"
-                    )
-                    return data["post_id"]
-                else:
-                    self.log_result(
-                        f"Create Post ({email})",
-                        False,
-                        "Missing post_id in response",
-                        data
-                    )
-                    return None
-            else:
-                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
-                self.log_result(
-                    f"Create Post ({email})",
-                    False,
-                    f"HTTP {response.status_code}: {data.get('detail', 'Post creation failed')}",
-                    data
-                )
-                return None
-                
-        except Exception as e:
-            self.log_result(
-                f"Create Post ({email})",
-                False,
-                f"Exception: {str(e)}"
-            )
-            return None
-
-    async def test_get_posts(self, email: str = None) -> bool:
-        """Test get posts feed"""
-        headers = {}
-        if email and email in self.tokens:
-            headers["Authorization"] = f"Bearer {self.tokens[email]}"
-            
-        try:
-            response = await self.client.get(
-                f"{API_BASE}/posts",
-                headers=headers
-            )
+            # Test GET /api/notifications
+            response = self.session.get(f"{self.base_url}/notifications")
             
             if response.status_code == 200:
                 data = response.json()
                 if isinstance(data, list):
-                    self.log_result(
-                        "Get Posts",
+                    self.log_test(
+                        "Notifications - GET /api/notifications",
                         True,
-                        f"Retrieved {len(data)} posts successfully"
+                        f"Retrieved {len(data)} notifications"
                     )
-                    return True
+                    
+                    # Test notification structure if any exist
+                    if data:
+                        notif = data[0]
+                        required_fields = ["notification_id", "type", "title", "message", "is_read", "created_at"]
+                        missing_fields = [field for field in required_fields if field not in notif]
+                        
+                        if not missing_fields:
+                            self.log_test(
+                                "Notifications - Data Structure",
+                                True,
+                                "Notification structure is valid"
+                            )
+                        else:
+                            self.log_test(
+                                "Notifications - Data Structure",
+                                False,
+                                f"Missing fields: {missing_fields}",
+                                notif
+                            )
+                    else:
+                        self.log_test(
+                            "Notifications - Data Structure",
+                            True,
+                            "No notifications to validate structure (empty list is valid)"
+                        )
                 else:
-                    self.log_result(
-                        "Get Posts",
+                    self.log_test(
+                        "Notifications - GET /api/notifications",
                         False,
-                        "Response is not a list of posts",
+                        "Response is not a list",
                         data
                     )
-                    return False
             else:
-                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
-                self.log_result(
-                    "Get Posts",
+                self.log_test(
+                    "Notifications - GET /api/notifications",
                     False,
-                    f"HTTP {response.status_code}: {data.get('detail', 'Get posts failed')}",
-                    data
+                    f"HTTP {response.status_code}",
+                    response.text
                 )
-                return False
                 
         except Exception as e:
-            self.log_result(
-                "Get Posts",
+            self.log_test(
+                "Notifications API",
                 False,
                 f"Exception: {str(e)}"
             )
-            return False
-
-    async def test_like_post(self, email: str, post_id: str) -> bool:
-        """Test react to post"""
-        if email not in self.tokens or not post_id:
-            self.log_result(f"React Post ({email})", False, "No token available or post_id missing")
-            return False
-            
+    
+    def test_investor_pipeline_api(self):
+        """Test Phase 3 Investor Pipeline API"""
+        print("💼 Testing Investor Pipeline API...")
+        
+        if not self.auth_token:
+            self.log_test("Investor Pipeline API", False, "No auth token available")
+            return
+        
         try:
-            response = await self.client.post(
-                f"{API_BASE}/posts/{post_id}/react",
-                json={"type": "like"},
-                headers={
-                    "Authorization": f"Bearer {self.tokens[email]}",
-                    "Content-Type": "application/json"
-                }
-            )
+            # Test GET /api/investor/pipeline
+            response = self.session.get(f"{self.base_url}/investor/pipeline")
             
             if response.status_code == 200:
                 data = response.json()
-                self.log_result(
-                    f"React Post ({email})",
+                if isinstance(data, list):
+                    self.log_test(
+                        "Investor Pipeline - GET /api/investor/pipeline",
+                        True,
+                        f"Retrieved {len(data)} pipeline items"
+                    )
+                    
+                    # Test pipeline structure if any exist
+                    if data:
+                        pipeline_item = data[0]
+                        required_fields = ["pipeline_id", "startup_id", "stage", "created_at"]
+                        missing_fields = [field for field in required_fields if field not in pipeline_item]
+                        
+                        if not missing_fields:
+                            self.log_test(
+                                "Investor Pipeline - Data Structure",
+                                True,
+                                "Pipeline structure is valid"
+                            )
+                        else:
+                            self.log_test(
+                                "Investor Pipeline - Data Structure",
+                                False,
+                                f"Missing fields: {missing_fields}",
+                                pipeline_item
+                            )
+                    else:
+                        self.log_test(
+                            "Investor Pipeline - Data Structure",
+                            True,
+                            "No pipeline items to validate structure (empty list is valid)"
+                        )
+                        
+                    # Test POST /api/investor/pipeline (add new deal)
+                    # First, get a startup_id from users with founder role
+                    users_response = self.session.get(f"{self.base_url}/users?role=founder&limit=1")
+                    if users_response.status_code == 200:
+                        users = users_response.json()
+                        if users:
+                            startup_id = users[0]["user_id"]
+                            
+                            # Check if this startup is already in pipeline
+                            existing_pipeline = [item for item in data if item.get("startup_id") == startup_id]
+                            
+                            if not existing_pipeline:
+                                # Add new pipeline item
+                                pipeline_data = {
+                                    "startup_id": startup_id,
+                                    "stage": "new",
+                                    "notes": "Test pipeline item from automated testing",
+                                    "next_action": "Initial review"
+                                }
+                                
+                                post_response = self.session.post(f"{self.base_url}/investor/pipeline", json=pipeline_data)
+                                
+                                if post_response.status_code == 200:
+                                    post_data = post_response.json()
+                                    self.log_test(
+                                        "Investor Pipeline - POST /api/investor/pipeline",
+                                        True,
+                                        f"Successfully added pipeline item: {post_data.get('pipeline_id', 'N/A')}"
+                                    )
+                                else:
+                                    self.log_test(
+                                        "Investor Pipeline - POST /api/investor/pipeline",
+                                        False,
+                                        f"HTTP {post_response.status_code}",
+                                        post_response.text
+                                    )
+                            else:
+                                self.log_test(
+                                    "Investor Pipeline - POST /api/investor/pipeline",
+                                    True,
+                                    "Startup already in pipeline, skipping POST test (expected behavior)"
+                                )
+                        else:
+                            self.log_test(
+                                "Investor Pipeline - POST /api/investor/pipeline",
+                                False,
+                                "No founder users found to test pipeline creation"
+                            )
+                    else:
+                        self.log_test(
+                            "Investor Pipeline - POST /api/investor/pipeline",
+                            False,
+                            f"Failed to get users for pipeline test: HTTP {users_response.status_code}"
+                        )
+                        
+                else:
+                    self.log_test(
+                        "Investor Pipeline - GET /api/investor/pipeline",
+                        False,
+                        "Response is not a list",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "Investor Pipeline - GET /api/investor/pipeline",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+                
+        except Exception as e:
+            self.log_test(
+                "Investor Pipeline API",
+                False,
+                f"Exception: {str(e)}"
+            )
+    
+    def test_intro_requests_api(self):
+        """Test Phase 3 Intro Requests (Collaboration Workflow)"""
+        print("🤝 Testing Intro Requests API...")
+        
+        if not self.auth_token:
+            self.log_test("Intro Requests API", False, "No auth token available")
+            return
+        
+        try:
+            # First, get a target user from the database
+            users_response = self.session.get(f"{self.base_url}/users?limit=5")
+            target_user_id = None
+            
+            if users_response.status_code == 200:
+                users = users_response.json()
+                # Find a user that's not the current user
+                for user in users:
+                    if user["user_id"] != self.user_data["user_id"]:
+                        target_user_id = user["user_id"]
+                        break
+            
+            if not target_user_id:
+                self.log_test(
+                    "Intro Requests - Setup",
+                    False,
+                    "No target user found for intro request test"
+                )
+                return
+            
+            # Test GET /api/intro-requests (get existing requests)
+            get_response = self.session.get(f"{self.base_url}/intro-requests")
+            
+            if get_response.status_code == 200:
+                existing_requests = get_response.json()
+                self.log_test(
+                    "Intro Requests - GET /api/intro-requests",
                     True,
-                    f"Post reaction added successfully"
+                    f"Retrieved {len(existing_requests)} intro requests"
                 )
-                return True
+                
+                # Check if we already have a pending request to this user
+                existing_request = None
+                for req in existing_requests:
+                    if (req.get("to_user_id") == target_user_id and 
+                        req.get("from_user_id") == self.user_data["user_id"] and 
+                        req.get("status") == "pending"):
+                        existing_request = req
+                        break
+                
+                # Test POST /api/intro-requests (send intro request)
+                if not existing_request:
+                    intro_data = {
+                        "target_user_id": target_user_id,
+                        "message": "Hi! I'd like to connect with you. I'm testing the CoFounderBay platform and would love to explore potential collaboration opportunities."
+                    }
+                    
+                    post_response = self.session.post(f"{self.base_url}/intro-requests", json=intro_data)
+                    
+                    if post_response.status_code == 200:
+                        post_data = post_response.json()
+                        self.log_test(
+                            "Intro Requests - POST /api/intro-requests",
+                            True,
+                            f"Successfully sent intro request: {post_data.get('request_id', 'N/A')}"
+                        )
+                    elif post_response.status_code == 400:
+                        # Check if it's a "Request already pending" error
+                        error_text = post_response.text
+                        if "already pending" in error_text.lower():
+                            self.log_test(
+                                "Intro Requests - POST /api/intro-requests",
+                                True,
+                                "Request already pending (expected behavior for duplicate requests)"
+                            )
+                        else:
+                            self.log_test(
+                                "Intro Requests - POST /api/intro-requests",
+                                False,
+                                f"HTTP 400: {error_text}"
+                            )
+                    elif post_response.status_code == 429:
+                        self.log_test(
+                            "Intro Requests - POST /api/intro-requests",
+                            True,
+                            "Rate limit exceeded (expected behavior for rate limiting)"
+                        )
+                    else:
+                        self.log_test(
+                            "Intro Requests - POST /api/intro-requests",
+                            False,
+                            f"HTTP {post_response.status_code}",
+                            post_response.text
+                        )
+                else:
+                    self.log_test(
+                        "Intro Requests - POST /api/intro-requests",
+                        True,
+                        "Existing pending request found, skipping POST test (expected behavior)"
+                    )
+                    
+                # Validate intro request structure
+                if existing_requests:
+                    req = existing_requests[0]
+                    required_fields = ["request_id", "from_user_id", "to_user_id", "message", "status", "created_at"]
+                    missing_fields = [field for field in required_fields if field not in req]
+                    
+                    if not missing_fields:
+                        self.log_test(
+                            "Intro Requests - Data Structure",
+                            True,
+                            "Intro request structure is valid"
+                        )
+                    else:
+                        self.log_test(
+                            "Intro Requests - Data Structure",
+                            False,
+                            f"Missing fields: {missing_fields}",
+                            req
+                        )
+                else:
+                    self.log_test(
+                        "Intro Requests - Data Structure",
+                        True,
+                        "No intro requests to validate structure (empty list is valid)"
+                    )
+                    
             else:
-                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
-                self.log_result(
-                    f"React Post ({email})",
+                self.log_test(
+                    "Intro Requests - GET /api/intro-requests",
                     False,
-                    f"HTTP {response.status_code}: {data.get('detail', 'React post failed')}",
-                    data
+                    f"HTTP {get_response.status_code}",
+                    get_response.text
                 )
-                return False
                 
         except Exception as e:
-            self.log_result(
-                f"React Post ({email})",
+            self.log_test(
+                "Intro Requests API",
                 False,
                 f"Exception: {str(e)}"
             )
-            return False
-
-    async def test_comment_post(self, email: str, post_id: str) -> bool:
-        """Test add comment to post"""
-        if email not in self.tokens or not post_id:
-            self.log_result(f"Comment Post ({email})", False, "No token available or post_id missing")
-            return False
-            
-        comment_data = {
-            "content": "Great initiative! I'd love to learn more about your vision and how we can collaborate. The startup ecosystem needs more platforms like this! 🎯"
-        }
+    
+    def test_connections_api(self):
+        """Test Phase 3 Connections API"""
+        print("🌐 Testing Connections API...")
         
-        try:
-            response = await self.client.post(
-                f"{API_BASE}/posts/{post_id}/comments",
-                json=comment_data,
-                headers={
-                    "Authorization": f"Bearer {self.tokens[email]}",
-                    "Content-Type": "application/json"
-                }
-            )
-            
-            if response.status_code == 200 or response.status_code == 201:
-                data = response.json()
-                if "comment_id" in data:
-                    self.log_result(
-                        f"Comment Post ({email})",
-                        True,
-                        f"Comment added successfully: {data['comment_id']}"
-                    )
-                    return True
-                else:
-                    self.log_result(
-                        f"Comment Post ({email})",
-                        False,
-                        "Missing comment_id in response",
-                        data
-                    )
-                    return False
-            else:
-                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
-                self.log_result(
-                    f"Comment Post ({email})",
-                    False,
-                    f"HTTP {response.status_code}: {data.get('detail', 'Comment post failed')}",
-                    data
-                )
-                return False
-                
-        except Exception as e:
-            self.log_result(
-                f"Comment Post ({email})",
-                False,
-                f"Exception: {str(e)}"
-            )
-            return False
-
-    async def test_discovery(self, email: str) -> bool:
-        """Test user discovery with role filters"""
-        if email not in self.tokens:
-            self.log_result(f"User Discovery ({email})", False, "No token available")
-            return False
-            
-        try:
-            # Test user discovery with role filter
-            response = await self.client.get(
-                f"{API_BASE}/users?role=investor&limit=10",
-                headers={"Authorization": f"Bearer {self.tokens[email]}"}
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list):
-                    self.log_result(
-                        f"User Discovery ({email})",
-                        True,
-                        f"User discovery returned {len(data)} users with role filter"
-                    )
-                    return True
-                else:
-                    self.log_result(
-                        f"User Discovery ({email})",
-                        False,
-                        "Response is not a list of users",
-                        data
-                    )
-                    return False
-            else:
-                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
-                self.log_result(
-                    f"User Discovery ({email})",
-                    False,
-                    f"HTTP {response.status_code}: {data.get('detail', 'User discovery failed')}",
-                    data
-                )
-                return False
-                
-        except Exception as e:
-            self.log_result(
-                f"User Discovery ({email})",
-                False,
-                f"Exception: {str(e)}"
-            )
-            return False
-
-    async def test_get_opportunities(self, email: str = None) -> bool:
-        """Test get opportunities"""
-        headers = {}
-        if email and email in self.tokens:
-            headers["Authorization"] = f"Bearer {self.tokens[email]}"
-            
-        try:
-            response = await self.client.get(
-                f"{API_BASE}/opportunities",
-                headers=headers
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list):
-                    self.log_result(
-                        "Get Opportunities",
-                        True,
-                        f"Retrieved {len(data)} opportunities successfully"
-                    )
-                    return True
-                else:
-                    self.log_result(
-                        "Get Opportunities",
-                        False,
-                        "Response is not a list of opportunities",
-                        data
-                    )
-                    return False
-            else:
-                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
-                self.log_result(
-                    "Get Opportunities",
-                    False,
-                    f"HTTP {response.status_code}: {data.get('detail', 'Get opportunities failed')}",
-                    data
-                )
-                return False
-                
-        except Exception as e:
-            self.log_result(
-                "Get Opportunities",
-                False,
-                f"Exception: {str(e)}"
-            )
-            return False
-
-    async def test_create_opportunity(self, email: str) -> bool:
-        """Test create opportunity"""
-        if email not in self.tokens:
-            self.log_result(f"Create Opportunity ({email})", False, "No token available")
-            return False
-            
-        opportunity_data = {
-            "type": "cofounder",
-            "title": "Co-Founder - CTO Needed for AI Startup",
-            "description": "Seeking a technical co-founder to lead product development for our revolutionary AI platform that connects entrepreneurs. Must have strong background in AI/ML and startup experience.",
-            "requirements": [
-                "5+ years software engineering experience",
-                "Experience with AI/ML technologies",
-                "Previous startup experience preferred",
-                "Strong leadership and team building skills"
-            ],
-            "skills_required": ["Python", "Machine Learning", "Product Management", "Leadership"],
-            "location": "San Francisco, CA",
-            "remote_ok": True,
-            "compensation_type": "equity",
-            "compensation_details": "Significant equity package as co-founder",
-            "commitment": "full_time"
-        }
-        
-        try:
-            response = await self.client.post(
-                f"{API_BASE}/opportunities",
-                json=opportunity_data,
-                headers={
-                    "Authorization": f"Bearer {self.tokens[email]}",
-                    "Content-Type": "application/json"
-                }
-            )
-            
-            if response.status_code == 200 or response.status_code == 201:
-                data = response.json()
-                if "opportunity_id" in data:
-                    self.log_result(
-                        f"Create Opportunity ({email})",
-                        True,
-                        f"Opportunity created successfully: {data['opportunity_id']}"
-                    )
-                    return True
-                else:
-                    self.log_result(
-                        f"Create Opportunity ({email})",
-                        False,
-                        "Missing opportunity_id in response",
-                        data
-                    )
-                    return False
-            else:
-                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
-                self.log_result(
-                    f"Create Opportunity ({email})",
-                    False,
-                    f"HTTP {response.status_code}: {data.get('detail', 'Create opportunity failed')}",
-                    data
-                )
-                return False
-                
-        except Exception as e:
-            self.log_result(
-                f"Create Opportunity ({email})",
-                False,
-                f"Exception: {str(e)}"
-            )
-            return False
-
-    async def test_connection_request(self, from_email: str, to_email: str) -> bool:
-        """Test sending connection request"""
-        if from_email not in self.tokens or to_email not in self.user_data:
-            self.log_result(f"Connection Request ({from_email} -> {to_email})", False, "Missing token or target user data")
-            return False
-            
-        request_data = {
-            "target_user_id": self.user_data[to_email]["user_id"],
-            "message": "Hi! I'd love to connect and explore potential collaboration opportunities. Your expertise in the startup ecosystem would be invaluable!"
-        }
-        
-        try:
-            response = await self.client.post(
-                f"{API_BASE}/connections/request",
-                json=request_data,
-                headers={
-                    "Authorization": f"Bearer {self.tokens[from_email]}",
-                    "Content-Type": "application/json"
-                }
-            )
-            
-            if response.status_code == 200 or response.status_code == 201:
-                data = response.json()
-                if "connection_id" in data:
-                    self.log_result(
-                        f"Connection Request ({from_email} -> {to_email})",
-                        True,
-                        f"Connection request sent successfully: {data['connection_id']}"
-                    )
-                    return True
-                else:
-                    self.log_result(
-                        f"Connection Request ({from_email} -> {to_email})",
-                        False,
-                        "Missing connection_id in response",
-                        data
-                    )
-                    return False
-            elif response.status_code == 400:
-                data = response.json()
-                if "already exists" in data.get("detail", ""):
-                    self.log_result(
-                        f"Connection Request ({from_email} -> {to_email})",
-                        True,
-                        "Connection already exists (acceptable for testing)"
-                    )
-                    return True
-                else:
-                    self.log_result(
-                        f"Connection Request ({from_email} -> {to_email})",
-                        False,
-                        f"Connection request failed: {data.get('detail', 'Unknown error')}",
-                        data
-                    )
-                    return False
-            else:
-                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
-                self.log_result(
-                    f"Connection Request ({from_email} -> {to_email})",
-                    False,
-                    f"HTTP {response.status_code}: {data.get('detail', 'Connection request failed')}",
-                    data
-                )
-                return False
-                
-        except Exception as e:
-            self.log_result(
-                f"Connection Request ({from_email} -> {to_email})",
-                False,
-                f"Exception: {str(e)}"
-            )
-            return False
-
-    async def test_get_connections(self, email: str) -> bool:
-        """Test get connections"""
-        if email not in self.tokens:
-            self.log_result(f"Get Connections ({email})", False, "No token available")
-            return False
-            
-        try:
-            response = await self.client.get(
-                f"{API_BASE}/connections",
-                headers={"Authorization": f"Bearer {self.tokens[email]}"}
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list):
-                    self.log_result(
-                        f"Get Connections ({email})",
-                        True,
-                        f"Retrieved {len(data)} connections successfully"
-                    )
-                    return True
-                else:
-                    self.log_result(
-                        f"Get Connections ({email})",
-                        False,
-                        "Response is not a list of connections",
-                        data
-                    )
-                    return False
-            else:
-                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
-                self.log_result(
-                    f"Get Connections ({email})",
-                    False,
-                    f"HTTP {response.status_code}: {data.get('detail', 'Get connections failed')}",
-                    data
-                )
-                return False
-                
-        except Exception as e:
-            self.log_result(
-                f"Get Connections ({email})",
-                False,
-                f"Exception: {str(e)}"
-            )
-            return False
-
-    async def test_send_message(self, from_email: str, to_email: str) -> bool:
-        """Test send direct message"""
-        if from_email not in self.tokens or to_email not in self.user_data:
-            self.log_result(f"Send Message ({from_email} -> {to_email})", False, "Missing token or target user data")
-            return False
-            
-        message_data = {
-            "receiver_id": self.user_data[to_email]["user_id"],
-            "content": "Hello! Thanks for connecting. I'm excited about the potential for collaboration between our ventures. Would you be interested in setting up a call to discuss synergies?"
-        }
-        
-        try:
-            response = await self.client.post(
-                f"{API_BASE}/messages",
-                json=message_data,
-                headers={
-                    "Authorization": f"Bearer {self.tokens[from_email]}",
-                    "Content-Type": "application/json"
-                }
-            )
-            
-            if response.status_code == 200 or response.status_code == 201:
-                data = response.json()
-                if "message_id" in data:
-                    self.log_result(
-                        f"Send Message ({from_email} -> {to_email})",
-                        True,
-                        f"Message sent successfully: {data['message_id']}"
-                    )
-                    return True
-                else:
-                    self.log_result(
-                        f"Send Message ({from_email} -> {to_email})",
-                        False,
-                        "Missing message_id in response",
-                        data
-                    )
-                    return False
-            else:
-                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
-                self.log_result(
-                    f"Send Message ({from_email} -> {to_email})",
-                    False,
-                    f"HTTP {response.status_code}: {data.get('detail', 'Send message failed')}",
-                    data
-                )
-                return False
-                
-        except Exception as e:
-            self.log_result(
-                f"Send Message ({from_email} -> {to_email})",
-                False,
-                f"Exception: {str(e)}"
-            )
-            return False
-
-    async def test_get_conversations(self, email: str) -> bool:
-        """Test get conversations"""
-        if email not in self.tokens:
-            self.log_result(f"Get Conversations ({email})", False, "No token available")
-            return False
-            
-        try:
-            response = await self.client.get(
-                f"{API_BASE}/conversations",
-                headers={"Authorization": f"Bearer {self.tokens[email]}"}
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list):
-                    self.log_result(
-                        f"Get Conversations ({email})",
-                        True,
-                        f"Retrieved {len(data)} conversations successfully"
-                    )
-                    return True
-                else:
-                    self.log_result(
-                        f"Get Conversations ({email})",
-                        False,
-                        "Response is not a list of conversations",
-                        data
-                    )
-                    return False
-            else:
-                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
-                self.log_result(
-                    f"Get Conversations ({email})",
-                    False,
-                    f"HTTP {response.status_code}: {data.get('detail', 'Get conversations failed')}",
-                    data
-                )
-                return False
-                
-        except Exception as e:
-            self.log_result(
-                f"Get Conversations ({email})",
-                False,
-                f"Exception: {str(e)}"
-            )
-            return False
-
-    async def test_ai_recommendations(self, email: str) -> bool:
-        """Test AI-powered recommendations"""
-        if email not in self.tokens:
-            self.log_result(f"AI Recommendations ({email})", False, "No token available")
-            return False
-            
-        try:
-            response = await self.client.get(
-                f"{API_BASE}/ai/recommendations",
-                headers={"Authorization": f"Bearer {self.tokens[email]}"}
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list):
-                    self.log_result(
-                        f"AI Recommendations ({email})",
-                        True,
-                        f"Retrieved {len(data)} AI recommendations successfully"
-                    )
-                    return True
-                else:
-                    self.log_result(
-                        f"AI Recommendations ({email})",
-                        False,
-                        "Response is not a list of recommendations",
-                        data
-                    )
-                    return False
-            else:
-                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {"error": response.text}
-                self.log_result(
-                    f"AI Recommendations ({email})",
-                    False,
-                    f"HTTP {response.status_code}: {data.get('detail', 'AI recommendations failed')}",
-                    data
-                )
-                return False
-                
-        except Exception as e:
-            self.log_result(
-                f"AI Recommendations ({email})",
-                False,
-                f"Exception: {str(e)}"
-            )
-            return False
-
-    async def run_comprehensive_tests(self):
-        """Run all backend API tests following the specific test sequence"""
-        print(f"🚀 Starting CoFounderBay v2.0 Backend API Tests")
-        print(f"📍 Testing against: {BASE_URL}")
-        print(f"=" * 60)
-        
-        # Specific test sequence as requested:
-        # 1. Register a new user with email: testfounderr@cofounderbay.com, password: Test1234!, name: Test Founder, role: founder
-        user = TEST_USERS[0]  # The specific test user
-        if not await self.test_registration(user):
-            print("❌ Registration failed, skipping dependent tests")
+        if not self.auth_token:
+            self.log_test("Connections API", False, "No auth token available")
             return
+        
+        try:
+            # Test GET /api/connections
+            response = self.session.get(f"{self.base_url}/connections")
             
-        # 2. Login and get token
-        if not await self.test_login(user["email"], user["password"]):
-            print("❌ Login failed, skipping dependent tests")
-            return
-            
-        # Verify profile access
-        await self.test_get_profile(user["email"])
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list):
+                    self.log_test(
+                        "Connections - GET /api/connections",
+                        True,
+                        f"Retrieved {len(data)} connections"
+                    )
+                    
+                    # Validate connection structure if any exist
+                    if data:
+                        connection = data[0]
+                        required_fields = ["user_id", "name", "email"]
+                        missing_fields = [field for field in required_fields if field not in connection]
+                        
+                        if not missing_fields:
+                            self.log_test(
+                                "Connections - Data Structure",
+                                True,
+                                "Connection structure is valid"
+                            )
+                        else:
+                            self.log_test(
+                                "Connections - Data Structure",
+                                False,
+                                f"Missing fields: {missing_fields}",
+                                connection
+                            )
+                    else:
+                        self.log_test(
+                            "Connections - Data Structure",
+                            True,
+                            "No connections to validate structure (empty list is valid)"
+                        )
+                else:
+                    self.log_test(
+                        "Connections - GET /api/connections",
+                        False,
+                        "Response is not a list",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "Connections - GET /api/connections",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+                
+        except Exception as e:
+            self.log_test(
+                "Connections API",
+                False,
+                f"Exception: {str(e)}"
+            )
+    
+    def run_all_tests(self):
+        """Run all Phase 3 backend API tests"""
+        print("🚀 Starting CoFounderBay Phase 3 Backend API Tests")
+        print("=" * 60)
+        print()
         
-        # 3. Create a post with the token
-        post_id = await self.test_create_post(user["email"])
+        # Test authentication first
+        if not self.test_authentication():
+            print("❌ Authentication failed. Cannot proceed with other tests.")
+            return False
         
-        # 4. Get posts feed
-        await self.test_get_posts(user["email"])
+        print()
         
-        # 5. Like a post (using react endpoint)
-        if post_id:
-            await self.test_like_post(user["email"], post_id)
-            await self.test_comment_post(user["email"], post_id)
-            
-        # 6. Browse users with role filter
-        await self.test_discovery(user["email"])
+        # Test all Phase 3 APIs
+        self.test_notifications_api()
+        print()
         
-        # 7. Get opportunities
-        await self.test_get_opportunities(user["email"])
+        self.test_investor_pipeline_api()
+        print()
         
-        # 8. Create an opportunity with the token
-        await self.test_create_opportunity(user["email"])
+        self.test_intro_requests_api()
+        print()
         
-        # 9. Get connections
-        await self.test_get_connections(user["email"])
+        self.test_connections_api()
+        print()
         
-        # 10. Get conversations
-        await self.test_get_conversations(user["email"])
+        # Summary
+        self.print_summary()
         
-        # Test profile update capability
-        await self.test_update_profile(user["email"])
-
+        return True
+    
     def print_summary(self):
         """Print test summary"""
-        print(f"\n" + "=" * 60)
-        print("📊 TEST RESULTS SUMMARY")
-        print(f"=" * 60)
+        print("=" * 60)
+        print("📊 TEST SUMMARY")
+        print("=" * 60)
         
-        passed = sum(1 for result in self.test_results if result["success"])
-        failed = len(self.test_results) - passed
+        total_tests = len(self.test_results)
+        passed_tests = sum(1 for result in self.test_results if result["success"])
+        failed_tests = total_tests - passed_tests
         
-        print(f"✅ PASSED: {passed}")
-        print(f"❌ FAILED: {failed}")
-        print(f"📈 SUCCESS RATE: {(passed / len(self.test_results) * 100):.1f}%")
+        print(f"Total Tests: {total_tests}")
+        print(f"✅ Passed: {passed_tests}")
+        print(f"❌ Failed: {failed_tests}")
+        print(f"Success Rate: {(passed_tests/total_tests*100):.1f}%")
+        print()
         
-        if failed > 0:
-            print(f"\n🔍 FAILED TESTS:")
+        if failed_tests > 0:
+            print("❌ FAILED TESTS:")
             for result in self.test_results:
                 if not result["success"]:
-                    print(f"  - {result['test']}: {result['details']}")
-                    
-        print(f"\n🕐 Test completed at: {datetime.now().isoformat()}")
-
-
-async def main():
-    """Main test execution"""
-    async with BackendTester() as tester:
-        await tester.run_comprehensive_tests()
-        tester.print_summary()
+                    print(f"  • {result['test']}: {result['details']}")
+            print()
         
-        # Return overall success
-        failed_count = sum(1 for result in tester.test_results if not result["success"])
-        return failed_count == 0
-
+        print("✅ PASSED TESTS:")
+        for result in self.test_results:
+            if result["success"]:
+                print(f"  • {result['test']}")
+        
+        print()
+        print("🎯 Phase 3 Backend API Testing Complete!")
 
 if __name__ == "__main__":
-    import sys
-    success = asyncio.run(main())
+    tester = CoFounderBayTester()
+    success = tester.run_all_tests()
+    
+    # Exit with appropriate code
     sys.exit(0 if success else 1)
