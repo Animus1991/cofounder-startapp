@@ -1,0 +1,7 @@
+# name: cofounderbay-preview
+compatibility_date = "2026-09-04"
+
+pages_build_output_dir = "frontend/dist"
+
+[vars]
+# Set EXPO_PUBLIC_BACKEND_URL at build time for production API.
